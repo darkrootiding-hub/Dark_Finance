@@ -11,6 +11,9 @@ interface TransactionDao {
     @Query("SELECT * FROM transactions ORDER BY timestamp DESC")
     fun getAllTransactions(): Flow<List<Transaction>>
 
+    @Query("SELECT SUM(amount) FROM transactions WHERE type = :type AND timestamp >= :startTime AND timestamp <= :endTime")
+    fun getTotalByTypeAndMonth(type: TransactionType, startTime: Long, endTime: Long): Flow<Double?>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertTransaction(transaction: Transaction)
 
