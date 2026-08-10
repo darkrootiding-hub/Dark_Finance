@@ -574,12 +574,12 @@ fun AnalyticsSectionCard(
 
         Spacer(modifier = Modifier.height(18.dp))
 
-        if (pastSixMonths.isEmpty() || pastSixMonths.all { it.second == 0.0 }) {
+        if (pastSixMonths.isEmpty() || pastSixMonths.all { it.amount == 0.0 }) {
             Box(modifier = Modifier.fillMaxWidth().height(120.dp), contentAlignment = Alignment.Center) {
                 Text("No spending history available yet.", color = FintechTextSecondary, fontSize = 12.sp)
             }
         } else {
-            val maxAmount = remember(pastSixMonths) { pastSixMonths.maxOfOrNull { it.second }?.takeIf { it > 0 } ?: 1.0 }
+            val maxAmount = remember(pastSixMonths) { pastSixMonths.maxOfOrNull { it.amount }?.takeIf { it > 0 } ?: 1.0 }
             val lastIdx = pastSixMonths.lastIndex
 
             Row(
