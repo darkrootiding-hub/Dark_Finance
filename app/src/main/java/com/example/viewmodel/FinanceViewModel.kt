@@ -43,6 +43,11 @@ data class MonthlyStats(
     val savings: Double
 )
 
+data class MonthExpense(
+    val month: String,
+    val amount: Double
+)
+
 class FinanceViewModel(application: Application) : AndroidViewModel(application) {
     private val repository: TransactionRepository
     private val categoryDao: CategoryDao
@@ -206,8 +211,8 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
         }.sortedByDescending { it.sortKey }
     }.flowOn(Dispatchers.Default).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val pastSixMonthsExpenses: StateFlow<List<Pair<String, Double>>> = transactions.map { txs ->
-        val result = mutableListOf<Pair<String, Double>>()
+    val pastSixMonthsExpenses: StateFlow<List<MonthExpense>> = transactions.map { txs ->
+        val result = mutableListOf<MonthExpense>()
         val format = SimpleDateFormat("MMM", Locale.US)
         val now = Calendar.getInstance()
 
@@ -225,7 +230,7 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
                 txCal.get(Calendar.YEAR) == year
             }.sumOf { it.amount }
 
-            result.add(Pair(monthName, total))
+            result.add(MonthExpense(monthName, total))
         }
         result
     }.flowOn(Dispatchers.Default).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
