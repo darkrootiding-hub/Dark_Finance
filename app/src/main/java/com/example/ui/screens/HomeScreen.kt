@@ -694,6 +694,47 @@ fun AiInsightGlassCard(insight: String) {
 }
 
 @Composable
+fun AnalyticsBar(
+    month: String,
+    amount: Double,
+    maxAmount: Double,
+    isCurrent: Boolean,
+    index: Int
+) {
+    val fraction = (amount / maxAmount).toFloat().coerceAtLeast(0.08f)
+
+    val animFraction by animateFloatAsState(
+        targetValue = fraction,
+        animationSpec = tween(durationMillis = 800, delayMillis = index * 80),
+        label = "bar"
+    )
+
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Bottom,
+        modifier = Modifier.weight(1f)
+    ) {
+        Canvas(
+            modifier = Modifier
+                .width(22.dp)
+                .fillMaxHeight(animFraction)
+        ) {
+            drawRoundRect(
+                brush = if (isCurrent) Brush.verticalGradient(listOf(FintechPrimary, FintechSecondary)) else Brush.verticalGradient(listOf(FintechTextTertiary.copy(alpha = 0.4f), FintechTextTertiary.copy(alpha = 0.2f))),
+                cornerRadius = CornerRadius(10.dp.toPx(), 10.dp.toPx())
+            )
+        }
+        Spacer(modifier = Modifier.height(6.dp))
+        Text(
+            text = month,
+            fontSize = 11.sp,
+            fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Medium,
+            color = if (isCurrent) FintechPrimary else FintechTextSecondary
+        )
+    }
+}
+
+@Composable
 fun AnalyticsSectionCard(
     pastSixMonths: List<Pair<String, Double>>,
     format: NumberFormat
@@ -724,7 +765,7 @@ fun AnalyticsSectionCard(
                 Text("No spending history available yet.", color = FintechTextSecondary, fontSize = 12.sp)
             }
         } else {
-            val maxAmount = pastSixMonths.maxOfOrNull { it.second }?.takeIf { it > 0 } ?: 1.0
+            val maxAmount = remember(pastSixMonths) { pastSixMonths.maxOfOrNull { it.second }?.takeIf { it > 0 } ?: 1.0 }
             val lastIdx = pastSixMonths.lastIndex
 
             Row(
@@ -735,38 +776,13 @@ fun AnalyticsSectionCard(
                 verticalAlignment = Alignment.Bottom
             ) {
                 pastSixMonths.forEachIndexed { index, (month, amount) ->
-                    val isCurrent = index == lastIdx
-                    val fraction = (amount / maxAmount).toFloat().coerceAtLeast(0.08f)
-
-                    val animFraction by animateFloatAsState(
-                        targetValue = fraction,
-                        animationSpec = tween(durationMillis = 800, delayMillis = index * 80),
-                        label = "bar"
+                    AnalyticsBar(
+                        month = month,
+                        amount = amount,
+                        maxAmount = maxAmount,
+                        isCurrent = index == lastIdx,
+                        index = index
                     )
-
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Bottom,
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Canvas(
-                            modifier = Modifier
-                                .width(22.dp)
-                                .fillMaxHeight(animFraction)
-                        ) {
-                            drawRoundRect(
-                                brush = if (isCurrent) Brush.verticalGradient(listOf(FintechPrimary, FintechSecondary)) else Brush.verticalGradient(listOf(FintechTextTertiary.copy(alpha = 0.4f), FintechTextTertiary.copy(alpha = 0.2f))),
-                                cornerRadius = CornerRadius(10.dp.toPx(), 10.dp.toPx())
-                            )
-                        }
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Text(
-                            text = month,
-                            fontSize = 11.sp,
-                            fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Medium,
-                            color = if (isCurrent) FintechPrimary else FintechTextSecondary
-                        )
-                    }
                 }
             }
         }
@@ -775,15 +791,17 @@ fun AnalyticsSectionCard(
 
 @Composable
 fun GlassTransactionItem(tx: Transaction, format: NumberFormat) {
-    val isIncome = tx.type == TransactionType.INCOME
-    val isSavings = tx.type == TransactionType.SAVINGS
-    val amountColor = when {
-        isIncome -> FintechSuccess
-        isSavings -> PremiumGold
-        tx.type == TransactionType.EXPENSE -> FintechError
-        else -> FintechSecondary
+    val isIncome = remember(tx) { tx.type == TransactionType.INCOME }
+    val isSavings = remember(tx) { tx.type == TransactionType.SAVINGS }
+    val amountColor = remember(tx) {
+        when {
+            isIncome -> FintechSuccess
+            isSavings -> PremiumGold
+            tx.type == TransactionType.EXPENSE -> FintechError
+            else -> FintechSecondary
+        }
     }
-    val sign = if (isIncome || isSavings) "+" else if (tx.type == TransactionType.EXPENSE) "-" else ""
+    val sign = remember(tx) { if (isIncome || isSavings) "+" else if (tx.type == TransactionType.EXPENSE) "-" else "" }
 
     GlassCard(
         modifier = Modifier
@@ -797,7 +815,7 @@ fun GlassTransactionItem(tx: Transaction, format: NumberFormat) {
         ) {
             Surface(
                 shape = RoundedCornerShape(16.dp),
-                color = amountColor.copy(alpha = 0.12f),
+                color = remember(amountColor) { amountColor.copy(alpha = 0.12f) },
                 modifier = Modifier.size(44.dp)
             ) {
                 Box(contentAlignment = Alignment.Center) {
@@ -819,7 +837,7 @@ fun GlassTransactionItem(tx: Transaction, format: NumberFormat) {
             }
 
             Text(
-                text = "$sign${format.format(tx.amount)}",
+                text = remember(tx, format) { "$sign${format.format(tx.amount)}" },
                 fontWeight = FontWeight.Bold,
                 fontSize = 15.sp,
                 color = amountColor
