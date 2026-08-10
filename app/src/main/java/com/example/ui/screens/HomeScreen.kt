@@ -55,40 +55,14 @@ fun HomeScreen(
     onAddTransaction: (TransactionType) -> Unit = {}
 ) {
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
-    val userName by viewModel.userName.collectAsStateWithLifecycle()
-    val monthlySalary by viewModel.monthlySalary.collectAsStateWithLifecycle()
-    val transactions by viewModel.transactions.collectAsStateWithLifecycle()
-    val initialBalance by viewModel.initialBalance.collectAsStateWithLifecycle()
     val insight by viewModel.insight.collectAsStateWithLifecycle()
+    val transactions by viewModel.transactions.collectAsStateWithLifecycle()
     val pastSixMonths by viewModel.pastSixMonthsExpenses.collectAsStateWithLifecycle()
-    val totalIncomeThisMonth by viewModel.totalIncomeThisMonth.collectAsStateWithLifecycle()
-    val totalExpenseThisMonth by viewModel.totalExpenseThisMonth.collectAsStateWithLifecycle()
-    val cardNumber by viewModel.cardNumber.collectAsStateWithLifecycle()
-    val allTimeBalance by viewModel.allTimeBalance.collectAsStateWithLifecycle()
-    val allTimeIncome by viewModel.allTimeIncome.collectAsStateWithLifecycle()
-    val allTimeExpense by viewModel.allTimeExpense.collectAsStateWithLifecycle()
-    val allTimeSavings by viewModel.allTimeSavings.collectAsStateWithLifecycle()
     val format = remember { NumberFormat.getCurrencyInstance(Locale.US) }
 
     var isBalanceVisible by remember { mutableStateOf(true) }
     var hasUnreadNotifications by remember { mutableStateOf(false) }
     var showAiChatSheet by remember { mutableStateOf(false) }
-
-    // Dynamic Greeting based on current hour
-    val greetingTime = remember {
-        val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
-        when {
-            hour < 12 -> "Good Morning"
-            hour < 17 -> "Good Afternoon"
-            else -> "Good Evening"
-        }
-    }
-
-    // Calculate dynamic balance efficiently with remember
-    val budgetLeft = remember(monthlySalary, allTimeExpense) { (monthlySalary - allTimeExpense).coerceAtLeast(0.0) }
-    val changeThisMonth = remember(totalIncomeThisMonth, totalExpenseThisMonth) { totalIncomeThisMonth - totalExpenseThisMonth }
-    val startOfMonthBalance = remember(allTimeBalance, changeThisMonth) { allTimeBalance - changeThisMonth }
-    val percentageChange = remember(startOfMonthBalance, changeThisMonth) { if (startOfMonthBalance > 0) (changeThisMonth / startOfMonthBalance) * 100 else 0.0 }
 
     GlassBackground {
         LazyColumn(
@@ -98,17 +72,15 @@ fun HomeScreen(
             contentPadding = PaddingValues(top = 16.dp, bottom = 110.dp)
         ) {
             item {
-                HomeHeader(
-                    greetingTime = greetingTime,
-                    userName = userName,
+                HomeHeaderWrapper(
+                    viewModel = viewModel,
                     hasUnreadNotifications = hasUnreadNotifications,
-                    onProfileClick = { navController.navigate("settings") },
-                    onAiChatClick = { showAiChatSheet = true },
                     onNotificationClick = {
                         hasUnreadNotifications = false
                         navController.navigate("reports")
                     },
-                    onMoreClick = { navController.navigate("settings") }
+                    navController = navController,
+                    onAiChatClick = { showAiChatSheet = true }
                 )
             }
 
@@ -116,37 +88,37 @@ fun HomeScreen(
                 if (isLoading) {
                     ShimmerCard(modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp), height = 180.dp)
                 } else {
-                    PremiumBalanceCard(
-                        balance = format.format(allTimeBalance),
+                    PremiumBalanceCardWrapper(
+                        viewModel = viewModel,
                         isBalanceVisible = isBalanceVisible,
                         onToggleVisibility = { isBalanceVisible = !isBalanceVisible },
-                        cardNumber = cardNumber,
-                        percentageChange = percentageChange,
-                        navController = navController
+                        navController = navController,
+                        format = format
                     )
                 }
             }
 
             item {
-                HomeSummaryGrid(
-                    income = format.format(allTimeIncome),
-                    expenses = format.format(allTimeExpense),
-                    savings = format.format(allTimeSavings),
-                    budgetLeft = format.format(budgetLeft),
-                    onSummaryClick = { screen -> navController.navigate(screen) }
+                val onSummaryClick = remember(navController) { { screen: String -> navController.navigate(screen) } }
+                HomeSummaryGridWrapper(
+                    viewModel = viewModel,
+                    format = format,
+                    onSummaryClick = onSummaryClick
                 )
             }
 
             item {
+                val onOpenAiChat = remember { { showAiChatSheet = true } }
                 QuickActionsSection(
                     navController = navController,
                     onAddTransaction = onAddTransaction,
-                    onOpenAiChat = { showAiChatSheet = true }
+                    onOpenAiChat = onOpenAiChat
                 )
             }
 
             item {
-                AiAssistantBanner(onOpenAiChat = { showAiChatSheet = true })
+                val onOpenAiChat = remember { { showAiChatSheet = true } }
+                AiAssistantBanner(onOpenAiChat = onOpenAiChat)
             }
 
             if (insight != null) {
@@ -203,6 +175,33 @@ fun HomeScreen(
 }
 
 @Composable
+fun PremiumBalanceCardWrapper(
+    viewModel: FinanceViewModel,
+    isBalanceVisible: Boolean,
+    onToggleVisibility: () -> Unit,
+    navController: NavController,
+    format: NumberFormat
+) {
+    val allTimeBalance by viewModel.allTimeBalance.collectAsStateWithLifecycle()
+    val cardNumber by viewModel.cardNumber.collectAsStateWithLifecycle()
+    val totalIncomeThisMonth by viewModel.totalIncomeThisMonth.collectAsStateWithLifecycle()
+    val totalExpenseThisMonth by viewModel.totalExpenseThisMonth.collectAsStateWithLifecycle()
+
+    val changeThisMonth = remember(totalIncomeThisMonth, totalExpenseThisMonth) { totalIncomeThisMonth - totalExpenseThisMonth }
+    val startOfMonthBalance = remember(allTimeBalance, changeThisMonth) { allTimeBalance - changeThisMonth }
+    val percentageChange = remember(startOfMonthBalance, changeThisMonth) { if (startOfMonthBalance > 0) (changeThisMonth / startOfMonthBalance) * 100 else 0.0 }
+
+    PremiumBalanceCard(
+        balance = format.format(allTimeBalance),
+        isBalanceVisible = isBalanceVisible,
+        onToggleVisibility = onToggleVisibility,
+        cardNumber = cardNumber,
+        percentageChange = percentageChange,
+        navController = navController
+    )
+}
+
+@Composable
 fun PremiumBalanceCard(
     balance: String,
     isBalanceVisible: Boolean,
@@ -218,14 +217,7 @@ fun PremiumBalanceCard(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 20.dp, vertical = 12.dp)
-            .shadow(16.dp, RoundedCornerShape(28.dp), spotColor = FintechPrimary.copy(alpha = 0.35f))
-            .border(
-                width = 1.2.dp,
-                brush = Brush.linearGradient(
-                    colors = listOf(Color.White.copy(alpha = 0.8f), Color.White.copy(alpha = 0.2f))
-                ),
-                shape = RoundedCornerShape(28.dp)
-            )
+            .shadow(12.dp, RoundedCornerShape(28.dp), spotColor = FintechPrimary.copy(alpha = 0.3f))
             .clip(RoundedCornerShape(28.dp)),
         shape = RoundedCornerShape(28.dp),
         color = Color.Transparent
@@ -239,10 +231,15 @@ fun PremiumBalanceCard(
                             Color(0xFF2A2167),
                             Color(0xFF4C3BCF),
                             Color(0xFF4F8CFF)
-                        ),
-                        start = Offset(0f, 0f),
-                        end = Offset(1000f, 1000f)
+                        )
                     )
+                )
+                .border(
+                    width = 1.2.dp,
+                    brush = Brush.linearGradient(
+                        colors = listOf(Color.White.copy(alpha = 0.6f), Color.White.copy(alpha = 0.2f))
+                    ),
+                    shape = RoundedCornerShape(28.dp)
                 )
                 .padding(24.dp)
         ) {
@@ -553,7 +550,7 @@ fun AnalyticsBar(
 
 @Composable
 fun AnalyticsSectionCard(
-    pastSixMonths: List<Pair<String, Double>>,
+    pastSixMonths: List<com.example.viewmodel.MonthExpense>,
     format: NumberFormat
 ) {
     GlassCard(
@@ -592,10 +589,10 @@ fun AnalyticsSectionCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.Bottom
             ) {
-                pastSixMonths.forEachIndexed { index, (month, amount) ->
+                pastSixMonths.forEachIndexed { index, item ->
     AnalyticsBar(
-        month = month,
-        amount = amount,
+        month = item.month,
+        amount = item.amount,
         maxAmount = maxAmount,
         isCurrent = index == lastIdx,
         index = index,
@@ -662,6 +659,35 @@ fun GlassTransactionItem(tx: Transaction, format: NumberFormat) {
             )
         }
     }
+}
+
+@Composable
+fun HomeHeaderWrapper(
+    viewModel: FinanceViewModel,
+    hasUnreadNotifications: Boolean,
+    onNotificationClick: () -> Unit,
+    navController: NavController,
+    onAiChatClick: () -> Unit
+) {
+    val userName by viewModel.userName.collectAsStateWithLifecycle()
+    val greetingTime = remember {
+        val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
+        when {
+            hour < 12 -> "Good Morning"
+            hour < 17 -> "Good Afternoon"
+            else -> "Good Evening"
+        }
+    }
+
+    HomeHeader(
+        greetingTime = greetingTime,
+        userName = userName,
+        hasUnreadNotifications = hasUnreadNotifications,
+        onProfileClick = { navController.navigate("settings") },
+        onAiChatClick = onAiChatClick,
+        onNotificationClick = onNotificationClick,
+        onMoreClick = { navController.navigate("settings") }
+    )
 }
 
 @Composable
@@ -743,6 +769,28 @@ fun HomeHeader(
             }
         }
     }
+}
+
+@Composable
+fun HomeSummaryGridWrapper(
+    viewModel: FinanceViewModel,
+    format: NumberFormat,
+    onSummaryClick: (String) -> Unit
+) {
+    val allTimeIncome by viewModel.allTimeIncome.collectAsStateWithLifecycle()
+    val allTimeExpense by viewModel.allTimeExpense.collectAsStateWithLifecycle()
+    val allTimeSavings by viewModel.allTimeSavings.collectAsStateWithLifecycle()
+    val monthlySalary by viewModel.monthlySalary.collectAsStateWithLifecycle()
+
+    val budgetLeft = remember(monthlySalary, allTimeExpense) { (monthlySalary - allTimeExpense).coerceAtLeast(0.0) }
+
+    HomeSummaryGrid(
+        income = format.format(allTimeIncome),
+        expenses = format.format(allTimeExpense),
+        savings = format.format(allTimeSavings),
+        budgetLeft = format.format(budgetLeft),
+        onSummaryClick = onSummaryClick
+    )
 }
 
 @Composable
