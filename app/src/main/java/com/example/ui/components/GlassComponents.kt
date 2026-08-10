@@ -98,7 +98,7 @@ fun GlassCard(
         Modifier.clickable(onClick = onClick)
     } else Modifier
 
-    Surface(
+    Box(
         modifier = modifier
             .shadow(
                 elevation = elevation,
@@ -106,6 +106,7 @@ fun GlassCard(
                 ambientColor = FintechPrimary.copy(alpha = 0.08f),
                 spotColor = FintechSecondary.copy(alpha = 0.12f)
             )
+            .background(color = backgroundColor, shape = shape)
             .border(
                 width = 1.2.dp,
                 brush = Brush.linearGradient(
@@ -115,8 +116,7 @@ fun GlassCard(
             )
             .clip(shape)
             .then(clickModifier),
-        shape = shape,
-        color = backgroundColor
+        contentAlignment = Alignment.TopStart
     ) {
         Column(
             modifier = Modifier.padding(20.dp),
