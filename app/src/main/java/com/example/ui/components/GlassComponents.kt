@@ -98,6 +98,12 @@ fun GlassCard(
         Modifier.clickable(onClick = onClick)
     } else Modifier
 
+    val borderBrush = remember(borderColor) {
+        Brush.linearGradient(
+            colors = listOf(borderColor, borderColor.copy(alpha = 0.3f))
+        )
+    }
+
     Box(
         modifier = modifier
             .shadow(
@@ -109,9 +115,7 @@ fun GlassCard(
             .background(color = backgroundColor, shape = shape)
             .border(
                 width = 1.2.dp,
-                brush = Brush.linearGradient(
-                    colors = listOf(borderColor, borderColor.copy(alpha = 0.3f))
-                ),
+                brush = borderBrush,
                 shape = shape
             )
             .clip(shape)
