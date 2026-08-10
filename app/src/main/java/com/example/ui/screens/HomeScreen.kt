@@ -90,9 +90,9 @@ fun HomeScreen(
     val startOfMonthBalance = remember(allTimeBalance, changeThisMonth) { allTimeBalance - changeThisMonth }
     val percentageChange = remember(startOfMonthBalance, changeThisMonth) { if (startOfMonthBalance > 0) (changeThisMonth / startOfMonthBalance) * 100 else 0.0 }
 
-    val percentageChange = remember(startOfMonthBalance, changeThisMonth) { if (startOfMonthBalance > 0) (changeThisMonth / startOfMonthBalance) * 100 else 0.0 }
+    
 
-    GlassBackground {
+   
 
     GlassBackground {
         LazyColumn(
