@@ -31,12 +31,9 @@ jobs:
         with:
           gradle-version: '9.3.1'
 
-      - name: Ensure Gradle wrapper exists (self-heal)
+      - name: Regenerate Gradle wrapper (ensure official jar)
         run: |
-          if [ ! -f "gradle/wrapper/gradle-wrapper.jar" ]; then
-            echo "Wrapper jar missing — regenerating..."
-            gradle wrapper --gradle-version 9.3.1
-          fi
+          gradle wrapper --gradle-version 9.3.1 --distribution-type bin
           chmod +x ./gradlew
 
       - name: Validate Gradle wrapper
