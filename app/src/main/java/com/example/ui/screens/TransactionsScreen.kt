@@ -43,6 +43,9 @@ fun TransactionsScreen(
 ) {
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
     val transactions by viewModel.transactions.collectAsStateWithLifecycle()
+    val totalIncome by viewModel.allTimeIncome.collectAsStateWithLifecycle()
+    val totalExpenses by viewModel.allTimeExpense.collectAsStateWithLifecycle()
+    val allTimeBalance by viewModel.allTimeBalance.collectAsStateWithLifecycle()
     val format = remember { NumberFormat.getCurrencyInstance(Locale.US) }
 
     var searchQuery by remember { mutableStateOf("") }
@@ -50,8 +53,6 @@ fun TransactionsScreen(
     var txToDelete by remember { mutableStateOf<Transaction?>(null) }
     var showAiChatSheet by remember { mutableStateOf(false) }
 
-    val totalIncome = remember(transactions) { transactions.filter { it.type == TransactionType.INCOME }.sumOf { it.amount } }
-    val totalExpenses = remember(transactions) { transactions.filter { it.type == TransactionType.EXPENSE }.sumOf { it.amount } }
     val netBalance = remember(totalIncome, totalExpenses) { totalIncome - totalExpenses }
 
     GlassBackground {
@@ -199,8 +200,8 @@ fun TransactionsScreen(
             }
 
             val groupedTxs = remember(filteredTxs) {
+                val dateFormat = SimpleDateFormat("EEEE, dd MMM yyyy", Locale.US)
                 filteredTxs.groupBy {
-                    val dateFormat = SimpleDateFormat("EEEE, dd MMM yyyy", Locale.US)
                     dateFormat.format(Date(it.timestamp))
                 }
             }
