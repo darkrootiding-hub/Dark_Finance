@@ -97,84 +97,21 @@ fun HomeScreen(
                 .statusBarsPadding(),
             contentPadding = PaddingValues(top = 16.dp, bottom = 110.dp)
         ) {
-            // Top Header Row
             item {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 20.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.clickable { navController.navigate("settings") }
-                    ) {
-                        Surface(
-                            shape = CircleShape,
-                            color = FintechPrimary.copy(alpha = 0.15f),
-                            border = androidx.compose.foundation.BorderStroke(1.5.dp, FintechPrimary.copy(alpha = 0.5f)),
-                            modifier = Modifier.size(46.dp)
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    Icons.Default.Person,
-                                    contentDescription = "Profile",
-                                    tint = FintechPrimary,
-                                    modifier = Modifier.size(24.dp)
-                                )
-                            }
-                        }
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Column {
-                            Text(
-                                text = "$greetingTime,",
-                                fontSize = 12.sp,
-                                color = FintechTextSecondary
-                            )
-                            Text(
-                                text = userName,
-                                fontSize = 18.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = FintechTextPrimary
-                            )
-                        }
-                    }
-
-                    // AI Chat, Notification & Settings Glass Buttons
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        GlassIconButton(onClick = { showAiChatSheet = true }) {
-                            Icon(Icons.Default.AutoAwesome, contentDescription = "AI Assistant", tint = FintechPrimary, modifier = Modifier.size(20.dp))
-                        }
-
-                        Box {
-                            GlassIconButton(onClick = {
-                                hasUnreadNotifications = false
-                                navController.navigate("reports")
-                            }) {
-                                Icon(Icons.Default.NotificationsNone, contentDescription = "Notifications", tint = FintechTextPrimary, modifier = Modifier.size(20.dp))
-                            }
-                            if (hasUnreadNotifications) {
-                                Box(
-                                    modifier = Modifier
-                                        .align(Alignment.TopEnd)
-                                        .padding(2.dp)
-                                        .size(10.dp)
-                                        .clip(CircleShape)
-                                        .background(FintechError)
-                                        .border(1.5.dp, Color.White, CircleShape)
-                                )
-                            }
-                        }
-
-                        GlassIconButton(onClick = { navController.navigate("settings") }) {
-                            Icon(Icons.Default.MoreVert, contentDescription = "More", tint = FintechTextPrimary, modifier = Modifier.size(20.dp))
-                        }
-                    }
-                }
+                HomeHeader(
+                    greetingTime = greetingTime,
+                    userName = userName,
+                    hasUnreadNotifications = hasUnreadNotifications,
+                    onProfileClick = { navController.navigate("settings") },
+                    onAiChatClick = { showAiChatSheet = true },
+                    onNotificationClick = {
+                        hasUnreadNotifications = false
+                        navController.navigate("reports")
+                    },
+                    onMoreClick = { navController.navigate("settings") }
+                )
             }
 
-            // Glass Credit/Balance Card
             item {
                 if (isLoading) {
                     ShimmerCard(modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp), height = 180.dp)
@@ -190,58 +127,16 @@ fun HomeScreen(
                 }
             }
 
-            // Summary Cards Grid (Income, Expense, Savings, Budget)
             item {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 20.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    SummaryMiniCard(
-                        title = "Income",
-                        value = format.format(allTimeIncome),
-                        icon = Icons.Default.ArrowDownward,
-                        accentColor = FintechSuccess,
-                        modifier = Modifier.weight(1f),
-                        onClick = { navController.navigate("transactions") }
-                    )
-                    SummaryMiniCard(
-                        title = "Expenses",
-                        value = format.format(allTimeExpense),
-                        icon = Icons.Default.ArrowUpward,
-                        accentColor = FintechError,
-                        modifier = Modifier.weight(1f),
-                        onClick = { navController.navigate("transactions") }
-                    )
-                }
-
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 20.dp, vertical = 4.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    SummaryMiniCard(
-                        title = "Savings",
-                        value = format.format(allTimeSavings),
-                        icon = Icons.Default.PieChart,
-                        accentColor = PremiumGold,
-                        modifier = Modifier.weight(1f),
-                        onClick = { navController.navigate("transactions") }
-                    )
-                    SummaryMiniCard(
-                        title = "Budget Left",
-                        value = format.format(budgetLeft),
-                        icon = Icons.Default.AccountBalanceWallet,
-                        accentColor = FintechSecondary,
-                        modifier = Modifier.weight(1f),
-                        onClick = { navController.navigate("budget") }
-                    )
-                }
+                HomeSummaryGrid(
+                    income = format.format(allTimeIncome),
+                    expenses = format.format(allTimeExpense),
+                    savings = format.format(allTimeSavings),
+                    budgetLeft = format.format(budgetLeft),
+                    onSummaryClick = { screen -> navController.navigate(screen) }
+                )
             }
 
-            // Quick Actions Bar
             item {
                 QuickActionsSection(
                     navController = navController,
@@ -250,73 +145,16 @@ fun HomeScreen(
                 )
             }
 
-            // Interactive AI Finance Assistant Banner
             item {
-                GlassCard(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 20.dp, vertical = 6.dp),
-                    onClick = { showAiChatSheet = true }
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Surface(
-                                shape = CircleShape,
-                                color = Color.Transparent,
-                                modifier = Modifier
-                                    .size(40.dp)
-                                    .shadow(6.dp, CircleShape, spotColor = FintechPrimary.copy(alpha = 0.4f))
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .background(Brush.linearGradient(listOf(FintechPrimary, FintechSecondary))),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.AutoAwesome,
-                                        contentDescription = "AI Assistant",
-                                        tint = Color.White,
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                }
-                            }
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Column {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text("Groq AI Assistant", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = FintechTextPrimary)
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Surface(
-                                        shape = RoundedCornerShape(8.dp),
-                                        color = FintechPrimary.copy(alpha = 0.12f)
-                                    ) {
-                                        Text("TAP TO CHAT", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = FintechPrimary, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
-                                    }
-                                }
-                                Spacer(modifier = Modifier.height(2.dp))
-                                Text("Add income/expenses or delete entries by voice or chat!", fontSize = 11.sp, color = FintechTextSecondary)
-                            }
-                        }
-                        Icon(Icons.Default.ChevronRight, contentDescription = "Open Chat", tint = FintechPrimary)
-                    }
-                }
+                AiAssistantBanner(onOpenAiChat = { showAiChatSheet = true })
             }
 
-            // AI Financial Insight Card
             if (insight != null) {
                 item {
                     AiInsightGlassCard(insight = insight!!)
                 }
             }
 
-            // Analytics Section Bar Chart
             item {
                 AnalyticsSectionCard(
                     pastSixMonths = pastSixMonths,
@@ -324,32 +162,10 @@ fun HomeScreen(
                 )
             }
 
-            // Recent Transactions Header
             item {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 24.dp, vertical = 12.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Recent Activity",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = FintechTextPrimary
-                    )
-                    Text(
-                        text = "View All",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = FintechPrimary,
-                        fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier.clickable { navController.navigate("transactions") }
-                    )
-                }
+                RecentActivityHeader(onViewAllClick = { navController.navigate("transactions") })
             }
 
-            // Transactions List
             if (isLoading) {
                 item {
                     ShimmerTransactionList(count = 3)
@@ -847,3 +663,228 @@ fun GlassTransactionItem(tx: Transaction, format: NumberFormat) {
         }
     }
 }
+
+@Composable
+fun HomeHeader(
+    greetingTime: String,
+    userName: String,
+    hasUnreadNotifications: Boolean,
+    onProfileClick: () -> Unit,
+    onAiChatClick: () -> Unit,
+    onNotificationClick: () -> Unit,
+    onMoreClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.clickable(onClick = onProfileClick)
+        ) {
+            Surface(
+                shape = CircleShape,
+                color = FintechPrimary.copy(alpha = 0.15f),
+                border = androidx.compose.foundation.BorderStroke(1.5.dp, FintechPrimary.copy(alpha = 0.5f)),
+                modifier = Modifier.size(46.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        Icons.Default.Person,
+                        contentDescription = "Profile",
+                        tint = FintechPrimary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.width(12.dp))
+            Column {
+                Text(
+                    text = "$greetingTime,",
+                    fontSize = 12.sp,
+                    color = FintechTextSecondary
+                )
+                Text(
+                    text = userName,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = FintechTextPrimary
+                )
+            }
+        }
+
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            GlassIconButton(onClick = onAiChatClick) {
+                Icon(Icons.Default.AutoAwesome, contentDescription = "AI Assistant", tint = FintechPrimary, modifier = Modifier.size(20.dp))
+            }
+
+            Box {
+                GlassIconButton(onClick = onNotificationClick) {
+                    Icon(Icons.Default.NotificationsNone, contentDescription = "Notifications", tint = FintechTextPrimary, modifier = Modifier.size(20.dp))
+                }
+                if (hasUnreadNotifications) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(2.dp)
+                            .size(10.dp)
+                            .clip(CircleShape)
+                            .background(FintechError)
+                            .border(1.5.dp, Color.White, CircleShape)
+                    )
+                }
+            }
+
+            GlassIconButton(onClick = onMoreClick) {
+                Icon(Icons.Default.MoreVert, contentDescription = "More", tint = FintechTextPrimary, modifier = Modifier.size(20.dp))
+            }
+        }
+    }
+}
+
+@Composable
+fun HomeSummaryGrid(
+    income: String,
+    expenses: String,
+    savings: String,
+    budgetLeft: String,
+    onSummaryClick: (String) -> Unit
+) {
+    Column {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            SummaryMiniCard(
+                title = "Income",
+                value = income,
+                icon = Icons.Default.ArrowDownward,
+                accentColor = FintechSuccess,
+                modifier = Modifier.weight(1f),
+                onClick = { onSummaryClick("transactions") }
+            )
+            SummaryMiniCard(
+                title = "Expenses",
+                value = expenses,
+                icon = Icons.Default.ArrowUpward,
+                accentColor = FintechError,
+                modifier = Modifier.weight(1f),
+                onClick = { onSummaryClick("transactions") }
+            )
+        }
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            SummaryMiniCard(
+                title = "Savings",
+                value = savings,
+                icon = Icons.Default.PieChart,
+                accentColor = PremiumGold,
+                modifier = Modifier.weight(1f),
+                onClick = { onSummaryClick("transactions") }
+            )
+            SummaryMiniCard(
+                title = "Budget Left",
+                value = budgetLeft,
+                icon = Icons.Default.AccountBalanceWallet,
+                accentColor = FintechSecondary,
+                modifier = Modifier.weight(1f),
+                onClick = { onSummaryClick("budget") }
+            )
+        }
+    }
+}
+
+@Composable
+fun AiAssistantBanner(onOpenAiChat: () -> Unit) {
+    GlassCard(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 6.dp),
+        onClick = onOpenAiChat
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.weight(1f)
+            ) {
+                Surface(
+                    shape = CircleShape,
+                    color = Color.Transparent,
+                    modifier = Modifier
+                        .size(40.dp)
+                        .shadow(6.dp, CircleShape, spotColor = FintechPrimary.copy(alpha = 0.4f))
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Brush.linearGradient(listOf(FintechPrimary, FintechSecondary))),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.AutoAwesome,
+                            contentDescription = "AI Assistant",
+                            tint = Color.White,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.width(12.dp))
+                Column {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("Groq AI Assistant", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = FintechTextPrimary)
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = FintechPrimary.copy(alpha = 0.12f)
+                        ) {
+                            Text("TAP TO CHAT", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = FintechPrimary, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text("Add income/expenses or delete entries by voice or chat!", fontSize = 11.sp, color = FintechTextSecondary)
+                }
+            }
+            Icon(Icons.Default.ChevronRight, contentDescription = "Open Chat", tint = FintechPrimary)
+        }
+    }
+}
+
+@Composable
+fun RecentActivityHeader(onViewAllClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 24.dp, vertical = 12.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = "Recent Activity",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = FintechTextPrimary
+        )
+        Text(
+            text = "View All",
+            style = MaterialTheme.typography.bodyMedium,
+            color = FintechPrimary,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.clickable(onClick = onViewAllClick)
+        )
+    }
+}
+
