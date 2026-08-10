@@ -64,6 +64,10 @@ fun HomeScreen(
     val totalIncomeThisMonth by viewModel.totalIncomeThisMonth.collectAsStateWithLifecycle()
     val totalExpenseThisMonth by viewModel.totalExpenseThisMonth.collectAsStateWithLifecycle()
     val cardNumber by viewModel.cardNumber.collectAsStateWithLifecycle()
+    val allTimeBalance by viewModel.allTimeBalance.collectAsStateWithLifecycle()
+    val allTimeIncome by viewModel.allTimeIncome.collectAsStateWithLifecycle()
+    val allTimeExpense by viewModel.allTimeExpense.collectAsStateWithLifecycle()
+    val allTimeSavings by viewModel.allTimeSavings.collectAsStateWithLifecycle()
     val format = remember { NumberFormat.getCurrencyInstance(Locale.US) }
 
     var isBalanceVisible by remember { mutableStateOf(true) }
@@ -81,18 +85,14 @@ fun HomeScreen(
     }
 
     // Calculate dynamic balance efficiently with remember
-    val income = remember(transactions) { transactions.filter { it.type == TransactionType.INCOME }.sumOf { it.amount } }
-    val expense = remember(transactions) { transactions.filter { it.type == TransactionType.EXPENSE }.sumOf { it.amount } }
-    val totalBalance = remember(initialBalance, income, expense) { initialBalance + income - expense }
-    val savings = remember(transactions) { transactions.filter { it.type == TransactionType.SAVINGS }.sumOf { it.amount } }
-    val budgetLeft = remember(monthlySalary, expense) { (monthlySalary - expense).coerceAtLeast(0.0) }
+    val budgetLeft = remember(monthlySalary, allTimeExpense) { (monthlySalary - allTimeExpense).coerceAtLeast(0.0) }
     val changeThisMonth = remember(totalIncomeThisMonth, totalExpenseThisMonth) { totalIncomeThisMonth - totalExpenseThisMonth }
-    val startOfMonthBalance = remember(totalBalance, changeThisMonth) { totalBalance - changeThisMonth }
+    val startOfMonthBalance = remember(allTimeBalance, changeThisMonth) { allTimeBalance - changeThisMonth }
     val percentageChange = remember(startOfMonthBalance, changeThisMonth) { if (startOfMonthBalance > 0) (changeThisMonth / startOfMonthBalance) * 100 else 0.0 }
 
-    LaunchedEffect(transactions) {
-        viewModel.fetchInsights()
-    }
+    val percentageChange = remember(startOfMonthBalance, changeThisMonth) { if (startOfMonthBalance > 0) (changeThisMonth / startOfMonthBalance) * 100 else 0.0 }
+
+    GlassBackground {
 
     GlassBackground {
         LazyColumn(
@@ -184,7 +184,7 @@ fun HomeScreen(
                     ShimmerCard(modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp), height = 180.dp)
                 } else {
                     PremiumBalanceCard(
-                        balance = format.format(totalBalance),
+                        balance = format.format(allTimeBalance),
                         isBalanceVisible = isBalanceVisible,
                         onToggleVisibility = { isBalanceVisible = !isBalanceVisible },
                         cardNumber = cardNumber,
@@ -204,7 +204,7 @@ fun HomeScreen(
                 ) {
                     SummaryMiniCard(
                         title = "Income",
-                        value = format.format(income),
+                        value = format.format(allTimeIncome),
                         icon = Icons.Default.ArrowDownward,
                         accentColor = FintechSuccess,
                         modifier = Modifier.weight(1f),
@@ -212,7 +212,7 @@ fun HomeScreen(
                     )
                     SummaryMiniCard(
                         title = "Expenses",
-                        value = format.format(expense),
+                        value = format.format(allTimeExpense),
                         icon = Icons.Default.ArrowUpward,
                         accentColor = FintechError,
                         modifier = Modifier.weight(1f),
@@ -228,7 +228,7 @@ fun HomeScreen(
                 ) {
                     SummaryMiniCard(
                         title = "Savings",
-                        value = format.format(savings),
+                        value = format.format(allTimeSavings),
                         icon = Icons.Default.PieChart,
                         accentColor = PremiumGold,
                         modifier = Modifier.weight(1f),
