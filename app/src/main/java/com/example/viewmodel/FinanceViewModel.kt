@@ -37,6 +37,12 @@ data class MonthlySummary(
     val sortKey: Long
 )
 
+data class MonthlyStats(
+    val income: Double,
+    val expense: Double,
+    val savings: Double
+)
+
 class FinanceViewModel(application: Application) : AndroidViewModel(application) {
     private val repository: TransactionRepository
     private val categoryDao: CategoryDao
@@ -57,6 +63,23 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
             delay(500)
             _isLoading.value = false
         }
+    }
+
+    private fun getCurrentMonthRange(): Pair<Long, Long> {
+        val calendar = Calendar.getInstance()
+        calendar.set(Calendar.DAY_OF_MONTH, 1)
+        calendar.set(Calendar.HOUR_OF_DAY, 0)
+        calendar.set(Calendar.MINUTE, 0)
+        calendar.set(Calendar.SECOND, 0)
+        calendar.set(Calendar.MILLISECOND, 0)
+        val start = calendar.timeInMillis
+        calendar.set(Calendar.DAY_OF_MONTH, calendar.getActualMaximum(Calendar.DAY_OF_MONTH))
+        calendar.set(Calendar.HOUR_OF_DAY, 23)
+        calendar.set(Calendar.MINUTE, 59)
+        calendar.set(Calendar.SECOND, 59)
+        calendar.set(Calendar.MILLISECOND, 999)
+        val end = calendar.timeInMillis
+        return Pair(start, end)
     }
 
     val categories: StateFlow<List<Category>> = categoryDao.getAllCategories()
@@ -89,6 +112,20 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
     val cardNumber: StateFlow<String> = userPreferences.cardNumber
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "")
 
+    val monthlyStats: StateFlow<MonthlyStats> = run {
+        val range = getCurrentMonthRange()
+        val database = AppDatabase.getDatabase(getApplication())
+        val dao = database.transactionDao()
+
+        kotlinx.coroutines.flow.combine(
+            dao.getTotalByTypeAndMonth(TransactionType.INCOME, range.first, range.second),
+            dao.getTotalByTypeAndMonth(TransactionType.EXPENSE, range.first, range.second),
+            dao.getTotalByTypeAndMonth(TransactionType.SAVINGS, range.first, range.second)
+        ) { income, expense, savings ->
+            MonthlyStats(income ?: 0.0, expense ?: 0.0, savings ?: 0.0)
+        }.flowOn(Dispatchers.Default).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), MonthlyStats(0.0, 0.0, 0.0))
+    }
+
     fun updateCardNumber(number: String) {
         viewModelScope.launch {
             userPreferences.saveCardNumber(number)
@@ -107,61 +144,58 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
             started = SharingStarted.WhileSubscribed(5000),
             initialValue = emptyList()
         )
+
+    val allTimeBalance: StateFlow<Double> = kotlinx.coroutines.flow.combine(
+        transactions,
+        initialBalance
+    ) { txs, initial ->
+        val income = txs.filter { it.type == TransactionType.INCOME }.sumOf { it.amount }
+        val expense = txs.filter { it.type == TransactionType.EXPENSE }.sumOf { it.amount }
+        initial + income - expense
+    }.flowOn(Dispatchers.Default).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
+
+    val allTimeIncome: StateFlow<Double> = transactions.map { txs ->
+        txs.filter { it.type == TransactionType.INCOME }.sumOf { it.amount }
+    }.flowOn(Dispatchers.Default).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
+
+    val allTimeExpense: StateFlow<Double> = transactions.map { txs ->
+        txs.filter { it.type == TransactionType.EXPENSE }.sumOf { it.amount }
+    }.flowOn(Dispatchers.Default).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
+
+    val allTimeSavings: StateFlow<Double> = transactions.map { txs ->
+        txs.filter { it.type == TransactionType.SAVINGS }.sumOf { it.amount }
+    }.flowOn(Dispatchers.Default).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
+
+
         
     val expenseByCategoryThisMonth: StateFlow<Map<String, Double>> = transactions.map { txs ->
-        val calendar = Calendar.getInstance()
-        val currentMonth = calendar.get(Calendar.MONTH)
-        val currentYear = calendar.get(Calendar.YEAR)
-        
+        val range = getCurrentMonthRange()
         txs.filter {
-            val txCalendar = Calendar.getInstance().apply { timeInMillis = it.timestamp }
-            it.type == TransactionType.EXPENSE &&
-            txCalendar.get(Calendar.MONTH) == currentMonth &&
-            txCalendar.get(Calendar.YEAR) == currentYear
+            it.type == TransactionType.EXPENSE && it.timestamp in range.first..range.second
         }.groupBy { it.category }.mapValues { entry -> entry.value.sumOf { it.amount } }
     }.flowOn(Dispatchers.Default).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
     
-    val totalExpenseThisMonth: StateFlow<Double> = expenseByCategoryThisMonth.map {
-        it.values.sum()
-    }.flowOn(Dispatchers.Default).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
+    val totalExpenseThisMonth: StateFlow<Double> = monthlyStats.map { it.expense }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
 
-    val totalSavingsThisMonth: StateFlow<Double> = transactions.map { txs ->
-        val calendar = Calendar.getInstance()
-        val currentMonth = calendar.get(Calendar.MONTH)
-        val currentYear = calendar.get(Calendar.YEAR)
-        
-        txs.filter {
-            val txCalendar = Calendar.getInstance().apply { timeInMillis = it.timestamp }
-            it.type == TransactionType.SAVINGS &&
-            txCalendar.get(Calendar.MONTH) == currentMonth &&
-            txCalendar.get(Calendar.YEAR) == currentYear
-        }.sumOf { it.amount }
-    }.flowOn(Dispatchers.Default).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
+    val totalSavingsThisMonth: StateFlow<Double> = monthlyStats.map { it.savings }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
 
-    val totalIncomeThisMonth: StateFlow<Double> = transactions.map { txs ->
-        val calendar = Calendar.getInstance()
-        val currentMonth = calendar.get(Calendar.MONTH)
-        val currentYear = calendar.get(Calendar.YEAR)
-        
-        txs.filter {
-            val txCalendar = Calendar.getInstance().apply { timeInMillis = it.timestamp }
-            it.type == TransactionType.INCOME &&
-            txCalendar.get(Calendar.MONTH) == currentMonth &&
-            txCalendar.get(Calendar.YEAR) == currentYear
-        }.sumOf { it.amount }
-    }.flowOn(Dispatchers.Default).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
+    val totalIncomeThisMonth: StateFlow<Double> = monthlyStats.map { it.income }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
 
     val monthlySummaries: StateFlow<List<MonthlySummary>> = transactions.map { txs ->
         val format = SimpleDateFormat("MMMM yyyy", Locale.US)
-        txs.groupBy { 
+        txs.groupBy {
             val cal = Calendar.getInstance().apply { timeInMillis = it.timestamp }
-            Pair(format.format(cal.time), cal.apply { 
+            val time = cal.apply {
                 set(Calendar.DAY_OF_MONTH, 1)
                 set(Calendar.HOUR_OF_DAY, 0)
                 set(Calendar.MINUTE, 0)
                 set(Calendar.SECOND, 0)
                 set(Calendar.MILLISECOND, 0)
-            }.timeInMillis)
+            }.timeInMillis
+            Pair(format.format(cal.time), time)
         }.map { (keyPair, monthTxs) ->
             MonthlySummary(
                 monthYear = keyPair.first,
@@ -175,21 +209,22 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
     val pastSixMonthsExpenses: StateFlow<List<Pair<String, Double>>> = transactions.map { txs ->
         val result = mutableListOf<Pair<String, Double>>()
         val format = SimpleDateFormat("MMM", Locale.US)
-        
+        val now = Calendar.getInstance()
+
         for (i in 5 downTo 0) {
             val cal = Calendar.getInstance()
             cal.add(Calendar.MONTH, -i)
             val month = cal.get(Calendar.MONTH)
             val year = cal.get(Calendar.YEAR)
             val monthName = format.format(cal.time)
-            
+
             val total = txs.filter {
                 val txCal = Calendar.getInstance().apply { timeInMillis = it.timestamp }
                 it.type == TransactionType.EXPENSE &&
                 txCal.get(Calendar.MONTH) == month &&
                 txCal.get(Calendar.YEAR) == year
             }.sumOf { it.amount }
-            
+
             result.add(Pair(monthName, total))
         }
         result
