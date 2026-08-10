@@ -699,7 +699,8 @@ fun AnalyticsBar(
     amount: Double,
     maxAmount: Double,
     isCurrent: Boolean,
-    index: Int
+    index: Int,
+    modifier: Modifier = Modifier
 ) {
     val fraction = (amount / maxAmount).toFloat().coerceAtLeast(0.08f)
 
@@ -710,10 +711,10 @@ fun AnalyticsBar(
     )
 
     Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Bottom,
-        modifier = Modifier.weight(1f)
-    ) {
+    horizontalAlignment = Alignment.CenterHorizontally,
+    verticalArrangement = Arrangement.Bottom,
+    modifier = modifier
+) {
         Canvas(
             modifier = Modifier
                 .width(22.dp)
@@ -776,14 +777,15 @@ fun AnalyticsSectionCard(
                 verticalAlignment = Alignment.Bottom
             ) {
                 pastSixMonths.forEachIndexed { index, (month, amount) ->
-                    AnalyticsBar(
-                        month = month,
-                        amount = amount,
-                        maxAmount = maxAmount,
-                        isCurrent = index == lastIdx,
-                        index = index
-                    )
-                }
+    AnalyticsBar(
+        month = month,
+        amount = amount,
+        maxAmount = maxAmount,
+        isCurrent = index == lastIdx,
+        index = index,
+        modifier = Modifier.weight(1f)
+    )
+}
             }
         }
     }
