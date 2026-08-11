@@ -194,7 +194,7 @@ fun PremiumBalanceCard(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 20.dp, vertical = 12.dp)
-            .shadow(12.dp, RoundedCornerShape(28.dp), spotColor = FintechPrimary.copy(alpha = 0.3f))
+            .shadow(12.dp, RoundedCornerShape(28.dp))
             .clip(RoundedCornerShape(28.dp)),
         shape = RoundedCornerShape(28.dp),
         color = Color.Transparent
@@ -413,7 +413,7 @@ fun QuickActionPill(
             border = androidx.compose.foundation.BorderStroke(1.dp, Color.White),
             modifier = Modifier
                 .size(52.dp)
-                .shadow(4.dp, CircleShape, spotColor = tint.copy(alpha = 0.2f))
+                .shadow(4.dp, CircleShape)
         ) {
             Box(contentAlignment = Alignment.Center) {
                 Icon(icon, contentDescription = label, tint = tint, modifier = Modifier.size(24.dp))
@@ -841,7 +841,7 @@ fun AiAssistantBanner(onOpenAiChat: () -> Unit) {
                     color = Color.Transparent,
                     modifier = Modifier
                         .size(40.dp)
-                        .shadow(6.dp, CircleShape, spotColor = FintechPrimary.copy(alpha = 0.4f))
+                        .shadow(6.dp, CircleShape)
                 ) {
                     Box(
                         modifier = Modifier
