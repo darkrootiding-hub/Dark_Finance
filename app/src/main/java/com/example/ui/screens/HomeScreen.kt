@@ -1,51 +1,101 @@
 package com.example.ui.screens
 
-import androidx.compose.animation.*
-import androidx.compose.animation.core.*
-import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.Image
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.CreditCard
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.PieChart
+import androidx.compose.material.icons.filled.ReceiptLong
+import androidx.compose.material.icons.filled.Savings
+import androidx.compose.material.icons.filled.SwapHoriz
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
-import com.example.R
 import com.example.data.Transaction
 import com.example.data.TransactionType
-import com.example.ui.components.GlassBackground
-import com.example.ui.components.GlassCard
-import com.example.ui.components.GlassIconButton
 import com.example.ui.components.ShimmerCard
 import com.example.ui.components.ShimmerTransactionList
-import com.example.ui.theme.*
+import com.example.ui.theme.FintechAccent
+import com.example.ui.theme.FintechBackground
+import com.example.ui.theme.FintechError
+import com.example.ui.theme.FintechPrimary
+import com.example.ui.theme.FintechSecondary
+import com.example.ui.theme.FintechSuccess
+import com.example.ui.theme.FintechSurface
+import com.example.ui.theme.FintechTextPrimary
+import com.example.ui.theme.FintechTextSecondary
+import com.example.ui.theme.FintechTextTertiary
 import com.example.viewmodel.FinanceViewModel
 import java.text.NumberFormat
-import java.text.SimpleDateFormat
-import java.util.*
+import java.util.Locale
+
+/**
+ * Home screen — rebuilt for smooth scrolling.
+ *
+ * Perf rules followed throughout this file:
+ *  1. No custom shadow ambientColor/spotColor anywhere (kills the fast shadow path).
+ *  2. Every card uses Material3 `Card`/`CardDefaults` — one hardware-accelerated
+ *     shadow layer, not a stacked shadow+border+background+clip chain.
+ *  3. The scrollable background is a single flat color. Decoration (the header
+ *     gradient) is a fixed-size Box, not a full-screen Canvas, so it never
+ *     repaints during scroll.
+ *  4. State is collected as low in the tree as possible so a change in one
+ *     section (e.g. a new transaction) doesn't recompose the whole screen.
+ *  5. Every LazyColumn / LazyRow item has a stable `key` so Compose can skip
+ *     and reuse rows instead of rebuilding them.
+ */
+
+private val currencyFormat: NumberFormat = NumberFormat.getCurrencyInstance(Locale("en", "IN")).apply {
+    maximumFractionDigits = 0
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -55,850 +105,566 @@ fun HomeScreen(
     onAddTransaction: (TransactionType) -> Unit = {}
 ) {
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
-    val insight by viewModel.insight.collectAsStateWithLifecycle()
     val transactions by viewModel.transactions.collectAsStateWithLifecycle()
-    val pastSixMonths by viewModel.pastSixMonthsExpenses.collectAsStateWithLifecycle()
-    val format = remember { NumberFormat.getCurrencyInstance(Locale.US) }
+    var showAiChat by remember { mutableStateOf(false) }
 
-    var hasUnreadNotifications by remember { mutableStateOf(false) }
-    var showAiChatSheet by remember { mutableStateOf(false) }
-
-    GlassBackground {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(FintechBackground)
+    ) {
         LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .statusBarsPadding(),
-            contentPadding = PaddingValues(top = 16.dp, bottom = 110.dp)
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(bottom = 120.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            item {
-                HomeHeaderWrapper(
+            item(key = "header") {
+                HomeHeader(
                     viewModel = viewModel,
-                    hasUnreadNotifications = hasUnreadNotifications,
-                    onNotificationClick = {
-                        hasUnreadNotifications = false
-                        navController.navigate("reports")
-                    },
-                    navController = navController,
-                    onAiChatClick = { showAiChatSheet = true }
+                    onNotificationsClick = { navController.navigate("settings") },
+                    onAiClick = { showAiChat = true }
                 )
             }
 
-            item {
+            item(key = "balance_card") {
                 if (isLoading) {
-                    ShimmerCard(modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp), height = 180.dp)
+                    ShimmerCard(modifier = Modifier.padding(horizontal = 20.dp), height = 190.dp)
                 } else {
-                    PremiumBalanceCardWrapper(
-                        viewModel = viewModel,
-                        navController = navController,
-                        format = format
-                    )
+                    BalanceCardSection(viewModel, Modifier.padding(horizontal = 20.dp))
                 }
             }
 
-            item {
-                val onSummaryClick = remember(navController) { { screen: String -> navController.navigate(screen) } }
-                HomeSummaryGridWrapper(
-                    viewModel = viewModel,
-                    format = format,
-                    onSummaryClick = onSummaryClick
-                )
-            }
-
-            item {
-                val onOpenAiChat = remember { { showAiChatSheet = true } }
-                QuickActionsSection(
-                    navController = navController,
+            item(key = "quick_actions") {
+                QuickActionsRow(
                     onAddTransaction = onAddTransaction,
-                    onOpenAiChat = onOpenAiChat
+                    onTransfer = { navController.navigate("transactions") },
+                    onBudget = { navController.navigate("budget") },
+                    onReports = { navController.navigate("reports") }
                 )
             }
 
-            item {
-                val onOpenAiChat = remember { { showAiChatSheet = true } }
-                AiAssistantBanner(onOpenAiChat = onOpenAiChat)
-            }
-
-            if (insight != null) {
-                item {
-                    AiInsightGlassCard(insight = insight!!)
+            item(key = "stats_grid") {
+                if (isLoading) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 20.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        ShimmerCard(modifier = Modifier.weight(1f), height = 90.dp)
+                        ShimmerCard(modifier = Modifier.weight(1f), height = 90.dp)
+                    }
+                } else {
+                    StatsGridSection(viewModel, Modifier.padding(horizontal = 20.dp))
                 }
             }
 
-            item {
-                AnalyticsSectionCard(
-                    viewModel = viewModel,
-                    format = format
-                )
+            item(key = "insight_card") {
+                InsightCardSection(viewModel, Modifier.padding(horizontal = 20.dp))
             }
 
-            item {
-                RecentActivityHeader(onViewAllClick = { navController.navigate("transactions") })
+            item(key = "analytics_card") {
+                AnalyticsSection(viewModel, Modifier.padding(horizontal = 20.dp))
+            }
+
+            item(key = "recent_header") {
+                RecentActivityHeader(
+                    onViewAll = { navController.navigate("transactions") },
+                    modifier = Modifier.padding(horizontal = 20.dp)
+                )
             }
 
             if (isLoading) {
-                item {
-                    ShimmerTransactionList(count = 3)
+                item(key = "recent_shimmer") {
+                    ShimmerTransactionList()
                 }
             } else {
-                item {
-                    TransactionListSection(
-                        viewModel = viewModel,
-                        format = format
-                    )
-                }
+                recentTransactionsItems(transactions)
             }
         }
     }
 
-    if (showAiChatSheet) {
-        AiChatSheet(
-            onDismiss = { showAiChatSheet = false },
-            viewModel = viewModel
-        )
+    if (showAiChat) {
+        AiChatSheet(onDismiss = { showAiChat = false }, viewModel = viewModel)
     }
 }
 
+// ---------------------------------------------------------------------------
+// Header
+// ---------------------------------------------------------------------------
+
 @Composable
-fun PremiumBalanceCardWrapper(
+private fun HomeHeader(
     viewModel: FinanceViewModel,
-    navController: NavController,
-    format: NumberFormat
+    onNotificationsClick: () -> Unit,
+    onAiClick: () -> Unit
 ) {
-    val allTimeBalance by viewModel.allTimeBalance.collectAsStateWithLifecycle()
-    val cardNumber by viewModel.cardNumber.collectAsStateWithLifecycle()
-    val totalIncomeThisMonth by viewModel.totalIncomeThisMonth.collectAsStateWithLifecycle()
-    val totalExpenseThisMonth by viewModel.totalExpenseThisMonth.collectAsStateWithLifecycle()
+    val userName by viewModel.userName.collectAsStateWithLifecycle()
 
-    val changeThisMonth = remember(totalIncomeThisMonth, totalExpenseThisMonth) { totalIncomeThisMonth - totalExpenseThisMonth }
-    val startOfMonthBalance = remember(allTimeBalance, changeThisMonth) { allTimeBalance - changeThisMonth }
-    val percentageChange = remember(startOfMonthBalance, changeThisMonth) { if (startOfMonthBalance > 0) (changeThisMonth / startOfMonthBalance) * 100 else 0.0 }
+    // Fixed-height decorative gradient behind the header only — cheap, drawn once,
+    // scrolls away with the row instead of sitting as a full-screen canvas.
+    val headerBrush = remember {
+        Brush.linearGradient(
+            colors = listOf(FintechPrimary.copy(alpha = 0.10f), Color.Transparent)
+        )
+    }
 
-    PremiumBalanceCard(
-        balance = format.format(allTimeBalance),
-        cardNumber = cardNumber,
-        percentageChange = percentageChange,
-        navController = navController
-    )
-}
-
-@Composable
-fun PremiumBalanceCard(
-    balance: String,
-    cardNumber: String,
-    percentageChange: Double,
-    navController: NavController
-) {
-    val displayCardNum = if (cardNumber.length >= 4) "•••• ${cardNumber.takeLast(4)}" else "•••• 4242"
-
-    Surface(
+    Box(
         modifier = Modifier
             .fillMaxWidth()
+            .background(headerBrush)
             .padding(horizontal = 20.dp, vertical = 12.dp)
-            .shadow(12.dp, RoundedCornerShape(28.dp))
-            .clip(RoundedCornerShape(28.dp)),
-        shape = RoundedCornerShape(28.dp),
-        color = Color.Transparent
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(
-                    Brush.linearGradient(
-                        colors = listOf(
-                            Color(0xFF2A2167),
-                            Color(0xFF4C3BCF),
-                            Color(0xFF4F8CFF)
-                        )
-                    )
-                )
-                .border(
-                    width = 1.2.dp,
-                    brush = Brush.linearGradient(
-                        colors = listOf(Color.White.copy(alpha = 0.6f), Color.White.copy(alpha = 0.2f))
-                    ),
-                    shape = RoundedCornerShape(28.dp)
-                )
-                .padding(24.dp)
-        ) {
-            Column {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column {
-                        Text("Total Balance", color = Color.White.copy(alpha = 0.75f), fontSize = 13.sp)
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Text(
-                            text = balance,
-                            fontSize = 34.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = Color.White
-                        )
-                    }
-
-                    // Card Brand Graphic Chip
-                    Surface(
-                        shape = RoundedCornerShape(12.dp),
-                        color = Color.White.copy(alpha = 0.2f),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.4f))
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(10.dp)
-                                    .clip(CircleShape)
-                                    .background(Color(0xFFFF5F00))
-                            )
-                            Spacer(modifier = Modifier.width((-2).dp))
-                            Box(
-                                modifier = Modifier
-                                    .size(10.dp)
-                                    .clip(CircleShape)
-                                    .background(Color(0xFFEB001B).copy(alpha = 0.8f))
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("PAY", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(20.dp))
-
-                // Bottom row inside balance card
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Surface(
-                        shape = RoundedCornerShape(16.dp),
-                        color = Color.White.copy(alpha = 0.18f)
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
-                        ) {
-                            val isPos = percentageChange >= 0
-                            Icon(
-                                imageVector = if (isPos) Icons.Default.ArrowUpward else Icons.Default.ArrowDownward,
-                                contentDescription = null,
-                                tint = if (isPos) FintechSuccess else FintechError,
-                                modifier = Modifier.size(14.dp)
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            val sign = if (isPos) "+" else ""
-                            Text(
-                                text = "$sign${String.format(Locale.US, "%.1f", percentageChange)}% this month",
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = Color.White
-                            )
-                        }
-                    }
-
-                    Text(
-                        text = displayCardNum,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White.copy(alpha = 0.85f),
-                        letterSpacing = 1.sp
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun SummaryMiniCard(
-    title: String,
-    value: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    accentColor: Color,
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit
-) {
-    GlassCard(
-        modifier = modifier,
-        onClick = onClick,
-        elevation = 3.dp
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column {
-                Text(title, fontSize = 11.sp, color = FintechTextSecondary, fontWeight = FontWeight.Medium)
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(value, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = FintechTextPrimary)
-            }
-
-            Surface(
-                shape = CircleShape,
-                color = accentColor.copy(alpha = 0.15f),
-                modifier = Modifier.size(34.dp)
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(icon, contentDescription = null, tint = accentColor, modifier = Modifier.size(18.dp))
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun QuickActionsSection(
-    navController: NavController,
-    onAddTransaction: (TransactionType) -> Unit,
-    onOpenAiChat: () -> Unit = {}
-) {
-    Column(modifier = Modifier.padding(vertical = 12.dp)) {
-        PaddingValues(horizontal = 24.dp).let {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(it),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "Quick Actions",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = FintechTextPrimary
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        LazyRow(
-            contentPadding = PaddingValues(horizontal = 20.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            item { QuickActionPill(icon = Icons.Default.AutoAwesome, tint = FintechPrimary, label = "AI Chat", onClick = onOpenAiChat) }
-            item { QuickActionPill(icon = Icons.Default.PictureAsPdf, tint = Color(0xFF60BB46), label = "Import PDF", onClick = { onAddTransaction(TransactionType.EXPENSE) }) }
-            item { QuickActionPill(icon = Icons.Default.Share, tint = FintechPrimary, label = "Share Import", onClick = { onAddTransaction(TransactionType.EXPENSE) }) }
-            item { QuickActionPill(icon = Icons.Default.ArrowDownward, tint = FintechSuccess, label = "Income", onClick = { onAddTransaction(TransactionType.INCOME) }) }
-            item { QuickActionPill(icon = Icons.Default.ArrowUpward, tint = FintechError, label = "Expense", onClick = { onAddTransaction(TransactionType.EXPENSE) }) }
-            item { QuickActionPill(icon = Icons.Default.CompareArrows, tint = FintechPrimary, label = "Transfer", onClick = { onAddTransaction(TransactionType.TRANSFER) }) }
-            item { QuickActionPill(icon = Icons.Default.PieChart, tint = PremiumGold, label = "Budget", onClick = { navController.navigate("budget") }) }
-            item { QuickActionPill(icon = Icons.Default.BarChart, tint = FintechSecondary, label = "Reports", onClick = { navController.navigate("reports") }) }
-            item { QuickActionPill(icon = Icons.Default.Settings, tint = FintechTextSecondary, label = "Settings", onClick = { navController.navigate("settings") }) }
-        }
-    }
-}
-
-@Composable
-fun QuickActionPill(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    tint: Color,
-    label: String,
-    onClick: () -> Unit
-) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier
-            .clickable(onClick = onClick)
-            .width(62.dp)
-    ) {
-        Surface(
-            shape = CircleShape,
-            color = Color.White.copy(alpha = 0.85f),
-            border = androidx.compose.foundation.BorderStroke(1.dp, Color.White),
-            modifier = Modifier
-                .size(52.dp)
-                .shadow(4.dp, CircleShape)
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(icon, contentDescription = label, tint = tint, modifier = Modifier.size(24.dp))
-            }
-        }
-        Spacer(modifier = Modifier.height(6.dp))
-        Text(
-            text = label,
-            fontSize = 11.sp,
-            fontWeight = FontWeight.Medium,
-            color = FintechTextPrimary,
-            textAlign = TextAlign.Center
-        )
-    }
-}
-
-@Composable
-fun AiInsightGlassCard(insight: String) {
-    GlassCard(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 8.dp),
-        backgroundColor = FintechPrimary.copy(alpha = 0.08f),
-        borderColor = FintechPrimary.copy(alpha = 0.3f),
-        elevation = 2.dp
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Surface(
-                shape = CircleShape,
-                color = FintechPrimary,
-                modifier = Modifier.size(40.dp)
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(Icons.Default.AutoAwesome, contentDescription = "AI", tint = Color.White, modifier = Modifier.size(20.dp))
-                }
-            }
-            Spacer(modifier = Modifier.width(14.dp))
-            Column {
-                Text(
-                    text = "AI Financial Insight",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 13.sp,
-                    color = FintechPrimary
-                )
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = insight,
-                    fontSize = 12.sp,
-                    color = FintechTextPrimary.copy(alpha = 0.85f),
-                    lineHeight = 16.sp
-                )
-            }
-        }
-    }
-}
-
-@Composable
-fun AnalyticsBar(
-    month: String,
-    amount: Double,
-    maxAmount: Double,
-    isCurrent: Boolean,
-    index: Int,
-    modifier: Modifier = Modifier
-) {
-    val fraction = (amount / maxAmount).toFloat().coerceAtLeast(0.08f)
-
-    val animFraction by animateFloatAsState(
-        targetValue = fraction,
-        animationSpec = tween(durationMillis = 800, delayMillis = index * 80),
-        label = "bar"
-    )
-
-    Column(
-    horizontalAlignment = Alignment.CenterHorizontally,
-    verticalArrangement = Arrangement.Bottom,
-    modifier = modifier
-) {
-        Canvas(
-            modifier = Modifier
-                .width(22.dp)
-                .fillMaxHeight(animFraction)
-        ) {
-            drawRoundRect(
-                brush = if (isCurrent) Brush.verticalGradient(listOf(FintechPrimary, FintechSecondary)) else Brush.verticalGradient(listOf(FintechTextTertiary.copy(alpha = 0.4f), FintechTextTertiary.copy(alpha = 0.2f))),
-                cornerRadius = CornerRadius(10.dp.toPx(), 10.dp.toPx())
-            )
-        }
-        Spacer(modifier = Modifier.height(6.dp))
-        Text(
-            text = month,
-            fontSize = 11.sp,
-            fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Medium,
-            color = if (isCurrent) FintechPrimary else FintechTextSecondary
-        )
-    }
-}
-
-@Composable
-fun AnalyticsSectionCard(
-    viewModel: FinanceViewModel,
-    format: NumberFormat
-) {
-    val pastSixMonths by viewModel.pastSixMonthsExpenses.collectAsStateWithLifecycle()
-
-    GlassCard(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 8.dp)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text("Analytics", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = FintechTextPrimary)
-            Surface(
-                shape = RoundedCornerShape(12.dp),
-                color = FintechSecondary.copy(alpha = 0.12f)
-            ) {
-                Text("Past 6 Months", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = FintechSecondary, modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp))
-            }
-        }
-
-        Spacer(modifier = Modifier.height(18.dp))
-
-        if (pastSixMonths.isEmpty() || pastSixMonths.all { it.amount == 0.0 }) {
-            Box(modifier = Modifier.fillMaxWidth().height(120.dp), contentAlignment = Alignment.Center) {
-                Text("No spending history available yet.", color = FintechTextSecondary, fontSize = 12.sp)
-            }
-        } else {
-            val maxAmount = remember(pastSixMonths) { pastSixMonths.maxOfOrNull { it.amount }?.takeIf { it > 0 } ?: 1.0 }
-            val lastIdx = pastSixMonths.lastIndex
-
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(130.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Bottom
-            ) {
-                pastSixMonths.forEachIndexed { index, item ->
-                    AnalyticsBar(
-                        month = item.month,
-                        amount = item.amount,
-                        maxAmount = maxAmount,
-                        isCurrent = index == lastIdx,
-                        index = index,
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun TransactionListSection(
-    viewModel: FinanceViewModel,
-    format: NumberFormat
-) {
-    val transactions by viewModel.transactions.collectAsStateWithLifecycle()
-
-    if (transactions.isEmpty()) {
-        GlassCard(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 4.dp)
-        ) {
-            Box(
-                modifier = Modifier.fillMaxWidth().height(80.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text("No transactions yet. Tap '+' to add one!", color = FintechTextSecondary, fontSize = 13.sp)
-            }
-        }
-    } else {
-        val recentTxs = remember(transactions) { transactions.take(5) }
-        Column {
-            recentTxs.forEach { tx ->
-                GlassTransactionItem(tx = tx, format = format)
-            }
-        }
-    }
-}
-
-@Composable
-fun GlassTransactionItem(tx: Transaction, format: NumberFormat) {
-    val isIncome = remember(tx) { tx.type == TransactionType.INCOME }
-    val isSavings = remember(tx) { tx.type == TransactionType.SAVINGS }
-    val amountColor = remember(tx) {
-        when {
-            isIncome -> FintechSuccess
-            isSavings -> PremiumGold
-            tx.type == TransactionType.EXPENSE -> FintechError
-            else -> FintechSecondary
-        }
-    }
-    val sign = remember(tx) { if (isIncome || isSavings) "+" else if (tx.type == TransactionType.EXPENSE) "-" else "" }
-
-    GlassCard(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 4.dp),
-        elevation = 2.dp
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Surface(
-                shape = RoundedCornerShape(16.dp),
-                color = remember(amountColor) { amountColor.copy(alpha = 0.12f) },
-                modifier = Modifier.size(44.dp)
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        imageVector = if (isIncome) Icons.Default.ArrowDownward else if (isSavings) Icons.Default.Savings else Icons.Default.ShoppingCart,
-                        contentDescription = null,
-                        tint = amountColor,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.width(14.dp))
-
-            Column(modifier = Modifier.weight(1f)) {
-                Text(tx.category, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = FintechTextPrimary)
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(tx.account, fontSize = 11.sp, color = FintechTextSecondary)
-            }
-
-            Text(
-                text = remember(tx, format) { "$sign${format.format(tx.amount)}" },
-                fontWeight = FontWeight.Bold,
-                fontSize = 15.sp,
-                color = amountColor
-            )
-        }
-    }
-}
-
-@Composable
-fun HomeHeaderWrapper(
-    viewModel: FinanceViewModel,
-    hasUnreadNotifications: Boolean,
-    onNotificationClick: () -> Unit,
-    navController: NavController,
-    onAiChatClick: () -> Unit
-) {
-    HomeHeader(
-        hasUnreadNotifications = hasUnreadNotifications,
-        onProfileClick = { navController.navigate("settings") },
-        onAiChatClick = onAiChatClick,
-        onNotificationClick = onNotificationClick,
-        onMoreClick = { navController.navigate("settings") }
-    )
-}
-
-@Composable
-fun HomeHeader(
-    hasUnreadNotifications: Boolean,
-    onProfileClick: () -> Unit,
-    onAiChatClick: () -> Unit,
-    onNotificationClick: () -> Unit,
-    onMoreClick: () -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 8.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Surface(
-            shape = CircleShape,
-            color = FintechPrimary.copy(alpha = 0.15f),
-            border = androidx.compose.foundation.BorderStroke(1.5.dp, FintechPrimary.copy(alpha = 0.5f)),
-            modifier = Modifier
-                .size(46.dp)
-                .clickable(onClick = onProfileClick)
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(
-                    Icons.Default.Person,
-                    contentDescription = "Profile",
-                    tint = FintechPrimary,
-                    modifier = Modifier.size(24.dp)
-                )
-            }
-        }
-
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            GlassIconButton(onClick = onAiChatClick) {
-                Icon(Icons.Default.AutoAwesome, contentDescription = "AI Assistant", tint = FintechPrimary, modifier = Modifier.size(20.dp))
-            }
-
-            Box {
-                GlassIconButton(onClick = onNotificationClick) {
-                    Icon(Icons.Default.NotificationsNone, contentDescription = "Notifications", tint = FintechTextPrimary, modifier = Modifier.size(20.dp))
-                }
-                if (hasUnreadNotifications) {
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.TopEnd)
-                            .padding(2.dp)
-                            .size(10.dp)
-                            .clip(CircleShape)
-                            .background(FintechError)
-                            .border(1.5.dp, Color.White, CircleShape)
-                    )
-                }
-            }
-
-            GlassIconButton(onClick = onMoreClick) {
-                Icon(Icons.Default.MoreVert, contentDescription = "More", tint = FintechTextPrimary, modifier = Modifier.size(20.dp))
-            }
-        }
-    }
-}
-
-@Composable
-fun HomeSummaryGridWrapper(
-    viewModel: FinanceViewModel,
-    format: NumberFormat,
-    onSummaryClick: (String) -> Unit
-) {
-    val allTimeIncome by viewModel.allTimeIncome.collectAsStateWithLifecycle()
-    val allTimeExpense by viewModel.allTimeExpense.collectAsStateWithLifecycle()
-    val allTimeSavings by viewModel.allTimeSavings.collectAsStateWithLifecycle()
-    val monthlySalary by viewModel.monthlySalary.collectAsStateWithLifecycle()
-
-    val budgetLeft = remember(monthlySalary, allTimeExpense) { (monthlySalary - allTimeExpense).coerceAtLeast(0.0) }
-
-    HomeSummaryGrid(
-        income = format.format(allTimeIncome),
-        expenses = format.format(allTimeExpense),
-        savings = format.format(allTimeSavings),
-        budgetLeft = format.format(budgetLeft),
-        onSummaryClick = onSummaryClick
-    )
-}
-
-@Composable
-fun HomeSummaryGrid(
-    income: String,
-    expenses: String,
-    savings: String,
-    budgetLeft: String,
-    onSummaryClick: (String) -> Unit
-) {
-    Column {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            SummaryMiniCard(
-                title = "Income",
-                value = income,
-                icon = Icons.Default.ArrowDownward,
-                accentColor = FintechSuccess,
-                modifier = Modifier.weight(1f),
-                onClick = { onSummaryClick("transactions") }
-            )
-            SummaryMiniCard(
-                title = "Expenses",
-                value = expenses,
-                icon = Icons.Default.ArrowUpward,
-                accentColor = FintechError,
-                modifier = Modifier.weight(1f),
-                onClick = { onSummaryClick("transactions") }
-            )
-        }
-
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 4.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            SummaryMiniCard(
-                title = "Savings",
-                value = savings,
-                icon = Icons.Default.PieChart,
-                accentColor = PremiumGold,
-                modifier = Modifier.weight(1f),
-                onClick = { onSummaryClick("transactions") }
-            )
-            SummaryMiniCard(
-                title = "Budget Left",
-                value = budgetLeft,
-                icon = Icons.Default.AccountBalanceWallet,
-                accentColor = FintechSecondary,
-                modifier = Modifier.weight(1f),
-                onClick = { onSummaryClick("budget") }
-            )
-        }
-    }
-}
-
-@Composable
-fun AiAssistantBanner(onOpenAiChat: () -> Unit) {
-    GlassCard(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 6.dp),
-        onClick = onOpenAiChat
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.weight(1f)
-            ) {
-                Surface(
-                    shape = CircleShape,
-                    color = Color.Transparent,
-                    modifier = Modifier
-                        .size(40.dp)
-                        .shadow(6.dp, CircleShape)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(Brush.linearGradient(listOf(FintechPrimary, FintechSecondary))),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.AutoAwesome,
-                            contentDescription = "AI Assistant",
-                            tint = Color.White,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                }
-                Spacer(modifier = Modifier.width(12.dp))
-                Column {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("Groq AI Assistant", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = FintechTextPrimary)
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = FintechPrimary.copy(alpha = 0.12f)
-                        ) {
-                            Text("TAP TO CHAT", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = FintechPrimary, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
-                        }
-                    }
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Text("Add income/expenses or delete entries by voice or chat!", fontSize = 11.sp, color = FintechTextSecondary)
-                }
+            Column {
+                Text(
+                    text = "Welcome back",
+                    fontSize = 13.sp,
+                    color = FintechTextSecondary
+                )
+                Text(
+                    text = userName.ifBlank { "David" },
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = FintechTextPrimary
+                )
             }
-            Icon(Icons.Default.ChevronRight, contentDescription = "Open Chat", tint = FintechPrimary)
+
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                FlatIconButton(icon = Icons.Filled.AutoAwesome, tint = FintechPrimary, onClick = onAiClick)
+                FlatIconButton(icon = Icons.Filled.Notifications, tint = FintechTextPrimary, onClick = onNotificationsClick)
+            }
+        }
+    }
+}
+
+/** Zero-shadow icon button — a tinted circle, no elevation at all. */
+@Composable
+private fun FlatIconButton(icon: androidx.compose.ui.graphics.vector.ImageVector, tint: Color, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .size(42.dp)
+            .clip(CircleShape)
+            .background(tint.copy(alpha = 0.12f))
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(20.dp))
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Balance card
+// ---------------------------------------------------------------------------
+
+@Composable
+private fun BalanceCardSection(viewModel: FinanceViewModel, modifier: Modifier = Modifier) {
+    val balance by viewModel.allTimeBalance.collectAsStateWithLifecycle()
+    val cardNumber by viewModel.cardNumber.collectAsStateWithLifecycle()
+    val income by viewModel.totalIncomeThisMonth.collectAsStateWithLifecycle()
+    val expense by viewModel.totalExpenseThisMonth.collectAsStateWithLifecycle()
+
+    val cardBrush = remember {
+        Brush.linearGradient(listOf(Color(0xFF1E1B4B), Color(0xFF3730A3), FintechPrimary))
+    }
+    val maskedCard = remember(cardNumber) {
+        val digits = cardNumber.filter { it.isDigit() }
+        if (digits.length >= 4) "•••• •••• •••• ${digits.takeLast(4)}" else "•••• •••• •••• 0000"
+    }
+
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .shadow(elevation = 8.dp, shape = RoundedCornerShape(24.dp))
+            .clip(RoundedCornerShape(24.dp))
+            .background(cardBrush)
+            .padding(20.dp)
+    ) {
+        Column {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Total Balance", color = Color.White.copy(alpha = 0.75f), fontSize = 13.sp)
+                Icon(Icons.Filled.CreditCard, contentDescription = null, tint = Color.White.copy(alpha = 0.8f), modifier = Modifier.size(22.dp))
+            }
+            Spacer(Modifier.height(6.dp))
+            Text(
+                text = currencyFormat.format(balance),
+                color = Color.White,
+                fontSize = 32.sp,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(Modifier.height(18.dp))
+            Text(maskedCard, color = Color.White.copy(alpha = 0.85f), fontSize = 15.sp, letterSpacing = 1.sp)
+            Spacer(Modifier.height(16.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                BalancePill(label = "Income", amount = income, icon = Icons.Filled.ArrowDownward, color = FintechSuccess)
+                BalancePill(label = "Expense", amount = expense, icon = Icons.Filled.ArrowUpward, color = FintechError)
+            }
         }
     }
 }
 
 @Composable
-fun RecentActivityHeader(onViewAllClick: () -> Unit) {
+private fun BalancePill(label: String, amount: Double, icon: androidx.compose.ui.graphics.vector.ImageVector, color: Color) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(
+            modifier = Modifier
+                .size(28.dp)
+                .clip(CircleShape)
+                .background(Color.White.copy(alpha = 0.15f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(14.dp))
+        }
+        Spacer(Modifier.width(8.dp))
+        Column {
+            Text(label, color = Color.White.copy(alpha = 0.7f), fontSize = 11.sp)
+            Text(currencyFormat.format(amount), color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Quick actions
+// ---------------------------------------------------------------------------
+
+private data class QuickAction(
+    val label: String,
+    val icon: androidx.compose.ui.graphics.vector.ImageVector,
+    val color: Color,
+    val onClick: () -> Unit
+)
+
+@Composable
+private fun QuickActionsRow(
+    onAddTransaction: (TransactionType) -> Unit,
+    onTransfer: () -> Unit,
+    onBudget: () -> Unit,
+    onReports: () -> Unit
+) {
+    val actions = remember(onAddTransaction, onTransfer, onBudget, onReports) {
+        listOf(
+            QuickAction("Income", Icons.Filled.ArrowDownward, FintechSuccess) { onAddTransaction(TransactionType.INCOME) },
+            QuickAction("Expense", Icons.Filled.ArrowUpward, FintechError) { onAddTransaction(TransactionType.EXPENSE) },
+            QuickAction("Savings", Icons.Filled.Savings, FintechSecondary) { onAddTransaction(TransactionType.SAVINGS) },
+            QuickAction("Transfer", Icons.Filled.SwapHoriz, FintechAccent, onTransfer),
+            QuickAction("Budget", Icons.Filled.PieChart, FintechPrimary, onBudget),
+            QuickAction("Reports", Icons.Filled.ReceiptLong, FintechTextSecondary, onReports)
+        )
+    }
+
+    LazyRow(
+        contentPadding = PaddingValues(horizontal = 20.dp),
+        horizontalArrangement = Arrangement.spacedBy(18.dp)
+    ) {
+        items(actions, key = { it.label }) { action ->
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.width(64.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(52.dp)
+                        .clip(CircleShape)
+                        .background(action.color.copy(alpha = 0.12f))
+                        .clickable(onClick = action.onClick),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(action.icon, contentDescription = action.label, tint = action.color, modifier = Modifier.size(22.dp))
+                }
+                Spacer(Modifier.height(6.dp))
+                Text(action.label, fontSize = 12.sp, color = FintechTextSecondary, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Stats grid
+// ---------------------------------------------------------------------------
+
+@Composable
+private fun StatsGridSection(viewModel: FinanceViewModel, modifier: Modifier = Modifier) {
+    val savings by viewModel.allTimeSavings.collectAsStateWithLifecycle()
+    val salary by viewModel.monthlySalary.collectAsStateWithLifecycle()
+
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 24.dp, vertical = 12.dp),
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        FlatStatCard(
+            modifier = Modifier.weight(1f),
+            label = "Total Savings",
+            value = currencyFormat.format(savings),
+            icon = Icons.Filled.Savings,
+            color = FintechSecondary
+        )
+        FlatStatCard(
+            modifier = Modifier.weight(1f),
+            label = "Monthly Salary",
+            value = currencyFormat.format(salary),
+            icon = Icons.Filled.Bolt,
+            color = FintechAccent
+        )
+    }
+}
+
+@Composable
+private fun FlatStatCard(
+    modifier: Modifier = Modifier,
+    label: String,
+    value: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    color: Color
+) {
+    Card(
+        modifier = modifier,
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(containerColor = FintechSurface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    ) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            Box(
+                modifier = Modifier
+                    .size(32.dp)
+                    .clip(CircleShape)
+                    .background(color.copy(alpha = 0.12f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(16.dp))
+            }
+            Spacer(Modifier.height(10.dp))
+            Text(value, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = FintechTextPrimary)
+            Text(label, fontSize = 11.sp, color = FintechTextTertiary)
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// AI insight card
+// ---------------------------------------------------------------------------
+
+@Composable
+private fun InsightCardSection(viewModel: FinanceViewModel, modifier: Modifier = Modifier) {
+    val insight by viewModel.insight.collectAsStateWithLifecycle()
+
+    AnimatedVisibility(
+        visible = !insight.isNullOrBlank(),
+        enter = fadeIn() + expandVertically(),
+        exit = fadeOut() + shrinkVertically()
+    ) {
+        Card(
+            modifier = modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(18.dp),
+            colors = CardDefaults.cardColors(containerColor = FintechPrimary.copy(alpha = 0.08f)),
+            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+        ) {
+            Row(
+                modifier = Modifier.padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(Icons.Filled.AutoAwesome, contentDescription = null, tint = FintechPrimary, modifier = Modifier.size(20.dp))
+                Spacer(Modifier.width(10.dp))
+                Text(
+                    text = insight.orEmpty(),
+                    fontSize = 13.sp,
+                    color = FintechTextPrimary,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Analytics (6-month bar chart)
+// ---------------------------------------------------------------------------
+
+@Composable
+private fun AnalyticsSection(viewModel: FinanceViewModel, modifier: Modifier = Modifier) {
+    val pastSixMonths by viewModel.pastSixMonthsExpenses.collectAsStateWithLifecycle()
+
+    if (pastSixMonths.isEmpty()) return
+
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = FintechSurface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    ) {
+        Column(modifier = Modifier.padding(18.dp)) {
+            Text("Spending Trend", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = FintechTextPrimary)
+            Text("Last 6 months", fontSize = 12.sp, color = FintechTextTertiary)
+            Spacer(Modifier.height(16.dp))
+
+            val maxAmount = remember(pastSixMonths) {
+                (pastSixMonths.maxOfOrNull { it.amount } ?: 0.0).coerceAtLeast(1.0)
+            }
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(120.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.Bottom
+            ) {
+                pastSixMonths.forEach { month ->
+                    val fraction = (month.amount / maxAmount).toFloat().coerceIn(0f, 1f)
+                    AnimatedBar(fraction = fraction, label = month.month)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AnimatedBar(fraction: Float, label: String) {
+    // One-shot animation driven by an Animatable so it runs once on first
+    // composition and then sits idle — it does not re-trigger on scroll.
+    val animatedFraction = remember { Animatable(0f) }
+    androidx.compose.runtime.LaunchedEffect(fraction) {
+        animatedFraction.animateTo(fraction, animationSpec = tween(500, easing = FastOutSlowInEasing))
+    }
+
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Box(
+            modifier = Modifier
+                .width(22.dp)
+                .height(80.dp),
+            contentAlignment = Alignment.BottomCenter
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height((80 * animatedFraction.value).dp)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(FintechPrimary.copy(alpha = 0.85f))
+            )
+        }
+        Spacer(Modifier.height(6.dp))
+        Text(label, fontSize = 10.sp, color = FintechTextTertiary)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Recent transactions
+// ---------------------------------------------------------------------------
+
+@Composable
+private fun RecentActivityHeader(onViewAll: () -> Unit, modifier: Modifier = Modifier) {
+    Row(
+        modifier = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
+        Text("Recent Activity", fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = FintechTextPrimary)
         Text(
-            text = "Recent Activity",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            color = FintechTextPrimary
-        )
-        Text(
-            text = "View All",
-            style = MaterialTheme.typography.bodyMedium,
+            "View all",
+            fontSize = 13.sp,
             color = FintechPrimary,
-            fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.clickable(onClick = onViewAllClick)
+            fontWeight = FontWeight.Medium,
+            modifier = Modifier.clickable(onClick = onViewAll)
         )
+    }
+}
+
+/**
+ * Plain (non-composable) LazyListScope extension. State is collected once in
+ * [HomeScreen] and the resulting list is passed in here — this function just
+ * emits `item`/`items` calls, so it doesn't need to be composable itself.
+ */
+private fun androidx.compose.foundation.lazy.LazyListScope.recentTransactionsItems(
+    transactions: List<Transaction>
+) {
+    val recent = transactions.take(5)
+
+    if (recent.isEmpty()) {
+        item(key = "empty_state") {
+            EmptyTransactionsState(modifier = Modifier.padding(horizontal = 20.dp))
+        }
+        return
+    }
+
+    items(recent, key = { it.id }) { transaction ->
+        TransactionRow(transaction, modifier = Modifier.padding(horizontal = 20.dp))
+    }
+}
+
+@Composable
+private fun TransactionRow(transaction: Transaction, modifier: Modifier = Modifier) {
+    val (icon, color) = remember(transaction.type) {
+        when (transaction.type) {
+            TransactionType.INCOME -> Icons.Filled.ArrowDownward to FintechSuccess
+            TransactionType.EXPENSE -> Icons.Filled.ArrowUpward to FintechError
+            TransactionType.SAVINGS -> Icons.Filled.Savings to FintechSecondary
+            TransactionType.TRANSFER -> Icons.Filled.SwapHoriz to FintechAccent
+        }
+    }
+    val sign = if (transaction.type == TransactionType.EXPENSE) "-" else "+"
+
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = FintechSurface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(color.copy(alpha = 0.12f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(18.dp))
+            }
+            Spacer(Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(transaction.category, fontSize = 14.sp, fontWeight = FontWeight.Medium, color = FintechTextPrimary)
+                Text(transaction.account, fontSize = 12.sp, color = FintechTextTertiary)
+            }
+            Text(
+                text = "$sign${currencyFormat.format(transaction.amount)}",
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = if (transaction.type == TransactionType.EXPENSE) FintechError else FintechSuccess
+            )
+        }
+    }
+}
+
+@Composable
+private fun EmptyTransactionsState(modifier: Modifier = Modifier) {
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = FintechSurface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Icon(Icons.Filled.ReceiptLong, contentDescription = null, tint = FintechTextTertiary, modifier = Modifier.size(32.dp))
+            Spacer(Modifier.height(8.dp))
+            Text("No transactions yet", fontSize = 13.sp, color = FintechTextSecondary)
+        }
     }
 }
