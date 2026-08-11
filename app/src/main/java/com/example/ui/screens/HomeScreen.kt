@@ -60,7 +60,6 @@ fun HomeScreen(
     val pastSixMonths by viewModel.pastSixMonthsExpenses.collectAsStateWithLifecycle()
     val format = remember { NumberFormat.getCurrencyInstance(Locale.US) }
 
-    var isBalanceVisible by remember { mutableStateOf(true) }
     var hasUnreadNotifications by remember { mutableStateOf(false) }
     var showAiChatSheet by remember { mutableStateOf(false) }
 
@@ -530,37 +529,6 @@ fun AnalyticsSectionCard(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-
-@Composable
-fun TransactionListSection(
-    viewModel: FinanceViewModel,
-    format: NumberFormat
-) {
-    val transactions by viewModel.transactions.collectAsStateWithLifecycle()
-
-    if (transactions.isEmpty()) {
-        GlassCard(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 4.dp)
-        ) {
-            Box(
-                modifier = Modifier.fillMaxWidth().height(80.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text("No transactions yet. Tap '+' to add one!", color = FintechTextSecondary, fontSize = 13.sp)
-            }
-        }
-    } else {
-        val recentTxs = remember(transactions) { transactions.take(5) }
-        Column {
-            recentTxs.forEach { tx ->
-                GlassTransactionItem(tx = tx, format = format)
-            }
-        }
-    }
-}
-
             Text("Analytics", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = FintechTextPrimary)
             Surface(
                 shape = RoundedCornerShape(12.dp),
@@ -588,15 +556,45 @@ fun TransactionListSection(
                 verticalAlignment = Alignment.Bottom
             ) {
                 pastSixMonths.forEachIndexed { index, item ->
-    AnalyticsBar(
-        month = item.month,
-        amount = item.amount,
-        maxAmount = maxAmount,
-        isCurrent = index == lastIdx,
-        index = index,
-        modifier = Modifier.weight(1f)
-    )
+                    AnalyticsBar(
+                        month = item.month,
+                        amount = item.amount,
+                        maxAmount = maxAmount,
+                        isCurrent = index == lastIdx,
+                        index = index,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+        }
+    }
 }
+
+@Composable
+fun TransactionListSection(
+    viewModel: FinanceViewModel,
+    format: NumberFormat
+) {
+    val transactions by viewModel.transactions.collectAsStateWithLifecycle()
+
+    if (transactions.isEmpty()) {
+        GlassCard(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 4.dp)
+        ) {
+            Box(
+                modifier = Modifier.fillMaxWidth().height(80.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("No transactions yet. Tap '+' to add one!", color = FintechTextSecondary, fontSize = 13.sp)
+            }
+        }
+    } else {
+        val recentTxs = remember(transactions) { transactions.take(5) }
+        Column {
+            recentTxs.forEach { tx ->
+                GlassTransactionItem(tx = tx, format = format)
             }
         }
     }
@@ -902,3 +900,5 @@ fun RecentActivityHeader(onViewAllClick: () -> Unit) {
         )
     }
 }
+
+
