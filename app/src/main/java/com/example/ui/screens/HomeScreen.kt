@@ -140,10 +140,12 @@ fun HomeScreen(
                     ShimmerTransactionList(count = 3)
                 }
             } else {
-                TransactionListSection(
-                    viewModel = viewModel,
-                    format = format
-                )
+                item {
+                    TransactionListSection(
+                        viewModel = viewModel,
+                        format = format
+                    )
+                }
             }
         }
     }
@@ -900,5 +902,3 @@ fun RecentActivityHeader(onViewAllClick: () -> Unit) {
         )
     }
 }
-
-
