@@ -66,6 +66,23 @@ jobs:
             echo "No GOOGLE_SERVICES_JSON secret set — skipping (build may warn or fail if Firebase requires it)."
           fi
 
+      # NEW STEP — without this, BuildConfig.GROQ_API_KEY bakes in the
+      # ".env.example" placeholder ("MY_GROQ_API_KEY") on every CI build,
+      # since .env is gitignored and never exists on a fresh runner checkout.
+      # The Secrets Gradle Plugin reads whichever of these two files it finds
+      # at the project root — this step creates the real one from the repo
+      # secret before Gradle runs.
+      - name: Restore .env (GROQ_API_KEY)
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+        run: |
+          if [ -n "$GROQ_API_KEY" ]; then
+            echo "GROQ_API_KEY=$GROQ_API_KEY" > .env
+            echo ".env restored from GROQ_API_KEY secret."
+          else
+            echo "No GROQ_API_KEY secret set — AI features will build with a placeholder key and stay disabled at runtime."
+          fi
+
       - name: Build debug APK
         run: ./gradlew assembleDebug --no-daemon --stacktrace
         env:
