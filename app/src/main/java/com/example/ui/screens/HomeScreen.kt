@@ -90,8 +90,6 @@ fun HomeScreen(
                 } else {
                     PremiumBalanceCardWrapper(
                         viewModel = viewModel,
-                        isBalanceVisible = isBalanceVisible,
-                        onToggleVisibility = { isBalanceVisible = !isBalanceVisible },
                         navController = navController,
                         format = format
                     )
@@ -129,7 +127,7 @@ fun HomeScreen(
 
             item {
                 AnalyticsSectionCard(
-                    pastSixMonths = pastSixMonths,
+                    viewModel = viewModel,
                     format = format
                 )
             }
@@ -142,26 +140,11 @@ fun HomeScreen(
                 item {
                     ShimmerTransactionList(count = 3)
                 }
-            } else if (transactions.isEmpty()) {
-                item {
-                    GlassCard(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 20.dp, vertical = 4.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier.fillMaxWidth().height(80.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text("No transactions yet. Tap '+' to add one!", color = FintechTextSecondary, fontSize = 13.sp)
-                        }
-                    }
-                }
             } else {
-                val recentTxs = transactions.take(5)
-                items(recentTxs, key = { it.id }) { tx ->
-                    GlassTransactionItem(tx = tx, format = format)
-                }
+                TransactionListSection(
+                    viewModel = viewModel,
+                    format = format
+                )
             }
         }
     }
@@ -177,8 +160,6 @@ fun HomeScreen(
 @Composable
 fun PremiumBalanceCardWrapper(
     viewModel: FinanceViewModel,
-    isBalanceVisible: Boolean,
-    onToggleVisibility: () -> Unit,
     navController: NavController,
     format: NumberFormat
 ) {
@@ -193,8 +174,6 @@ fun PremiumBalanceCardWrapper(
 
     PremiumBalanceCard(
         balance = format.format(allTimeBalance),
-        isBalanceVisible = isBalanceVisible,
-        onToggleVisibility = onToggleVisibility,
         cardNumber = cardNumber,
         percentageChange = percentageChange,
         navController = navController
@@ -204,13 +183,10 @@ fun PremiumBalanceCardWrapper(
 @Composable
 fun PremiumBalanceCard(
     balance: String,
-    isBalanceVisible: Boolean,
-    onToggleVisibility: () -> Unit,
     cardNumber: String,
     percentageChange: Double,
     navController: NavController
 ) {
-    val displayBalance = if (isBalanceVisible) balance else "••••••••"
     val displayCardNum = if (cardNumber.length >= 4) "•••• ${cardNumber.takeLast(4)}" else "•••• 4242"
 
     Surface(
@@ -250,21 +226,10 @@ fun PremiumBalanceCard(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("Total Balance", color = Color.White.copy(alpha = 0.75f), fontSize = 13.sp)
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Icon(
-                                imageVector = if (isBalanceVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
-                                contentDescription = "Toggle Balance",
-                                tint = Color.White.copy(alpha = 0.75f),
-                                modifier = Modifier
-                                    .size(16.dp)
-                                    .clickable(onClick = onToggleVisibility)
-                            )
-                        }
+                        Text("Total Balance", color = Color.White.copy(alpha = 0.75f), fontSize = 13.sp)
                         Spacer(modifier = Modifier.height(6.dp))
                         Text(
-                            text = displayBalance,
+                            text = balance,
                             fontSize = 34.sp,
                             fontWeight = FontWeight.ExtraBold,
                             color = Color.White
@@ -550,9 +515,11 @@ fun AnalyticsBar(
 
 @Composable
 fun AnalyticsSectionCard(
-    pastSixMonths: List<com.example.viewmodel.MonthExpense>,
+    viewModel: FinanceViewModel,
     format: NumberFormat
 ) {
+    val pastSixMonths by viewModel.pastSixMonthsExpenses.collectAsStateWithLifecycle()
+
     GlassCard(
         modifier = Modifier
             .fillMaxWidth()
@@ -563,6 +530,37 @@ fun AnalyticsSectionCard(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
+
+@Composable
+fun TransactionListSection(
+    viewModel: FinanceViewModel,
+    format: NumberFormat
+) {
+    val transactions by viewModel.transactions.collectAsStateWithLifecycle()
+
+    if (transactions.isEmpty()) {
+        GlassCard(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 4.dp)
+        ) {
+            Box(
+                modifier = Modifier.fillMaxWidth().height(80.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("No transactions yet. Tap '+' to add one!", color = FintechTextSecondary, fontSize = 13.sp)
+            }
+        }
+    } else {
+        val recentTxs = remember(transactions) { transactions.take(5) }
+        Column {
+            recentTxs.forEach { tx ->
+                GlassTransactionItem(tx = tx, format = format)
+            }
+        }
+    }
+}
+
             Text("Analytics", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = FintechTextPrimary)
             Surface(
                 shape = RoundedCornerShape(12.dp),
@@ -669,19 +667,7 @@ fun HomeHeaderWrapper(
     navController: NavController,
     onAiChatClick: () -> Unit
 ) {
-    val userName by viewModel.userName.collectAsStateWithLifecycle()
-    val greetingTime = remember {
-        val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
-        when {
-            hour < 12 -> "Good Morning"
-            hour < 17 -> "Good Afternoon"
-            else -> "Good Evening"
-        }
-    }
-
     HomeHeader(
-        greetingTime = greetingTime,
-        userName = userName,
         hasUnreadNotifications = hasUnreadNotifications,
         onProfileClick = { navController.navigate("settings") },
         onAiChatClick = onAiChatClick,
@@ -692,8 +678,6 @@ fun HomeHeaderWrapper(
 
 @Composable
 fun HomeHeader(
-    greetingTime: String,
-    userName: String,
     hasUnreadNotifications: Boolean,
     onProfileClick: () -> Unit,
     onAiChatClick: () -> Unit,
@@ -707,37 +691,20 @@ fun HomeHeader(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.clickable(onClick = onProfileClick)
+        Surface(
+            shape = CircleShape,
+            color = FintechPrimary.copy(alpha = 0.15f),
+            border = androidx.compose.foundation.BorderStroke(1.5.dp, FintechPrimary.copy(alpha = 0.5f)),
+            modifier = Modifier
+                .size(46.dp)
+                .clickable(onClick = onProfileClick)
         ) {
-            Surface(
-                shape = CircleShape,
-                color = FintechPrimary.copy(alpha = 0.15f),
-                border = androidx.compose.foundation.BorderStroke(1.5.dp, FintechPrimary.copy(alpha = 0.5f)),
-                modifier = Modifier.size(46.dp)
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        Icons.Default.Person,
-                        contentDescription = "Profile",
-                        tint = FintechPrimary,
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
-            }
-            Spacer(modifier = Modifier.width(12.dp))
-            Column {
-                Text(
-                    text = "$greetingTime,",
-                    fontSize = 12.sp,
-                    color = FintechTextSecondary
-                )
-                Text(
-                    text = userName,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = FintechTextPrimary
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    Icons.Default.Person,
+                    contentDescription = "Profile",
+                    tint = FintechPrimary,
+                    modifier = Modifier.size(24.dp)
                 )
             }
         }
@@ -935,4 +902,3 @@ fun RecentActivityHeader(onViewAllClick: () -> Unit) {
         )
     }
 }
-
