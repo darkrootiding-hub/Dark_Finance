@@ -106,11 +106,12 @@ fun GlassCard(
 
     Box(
         modifier = modifier
+            // Default shadow colors keep this on Compose's fast (hardware) shadow path.
+            // Custom ambientColor/spotColor here forced every card onto the slow
+            // offscreen-compositing path, which is what was causing scroll jank.
             .shadow(
                 elevation = elevation,
-                shape = shape,
-                ambientColor = FintechPrimary.copy(alpha = 0.08f),
-                spotColor = FintechSecondary.copy(alpha = 0.12f)
+                shape = shape
             )
             .background(color = backgroundColor, shape = shape)
             .border(
@@ -149,7 +150,7 @@ fun GlassIconButton(
                 color = Color.White.copy(alpha = 0.9f),
                 shape = CircleShape
             )
-            .shadow(4.dp, CircleShape, spotColor = FintechPrimary.copy(alpha = 0.1f)),
+            .shadow(4.dp, CircleShape),
         shape = CircleShape,
         color = containerColor
     ) {
